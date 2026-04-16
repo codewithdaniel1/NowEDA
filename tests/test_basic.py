@@ -23,7 +23,7 @@ def test_read_csv_returns_dataframe():
 
 def test_read_unsupported_raises():
     with pytest.raises(ValueError, match="Unsupported"):
-        noweda.read("data.parquet")
+        noweda.read("data.avro")
 
 
 # ---------------------------------------------------------------------------

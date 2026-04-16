@@ -1,3 +1,7 @@
+import warnings
+
+import pandas as pd
+
 from .base import BasePlugin
 
 
@@ -20,12 +24,13 @@ class SchemaPlugin(BasePlugin):
         if dtype.kind == "M":
             return "datetime"
 
-        # Try to parse object columns as datetime
+        # Try to parse object columns as datetime (suppress noisy pandas warnings)
         if dtype == "object":
             sample = series.dropna().astype(str).head(20)
-            import pandas as pd
             try:
-                pd.to_datetime(sample)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    pd.to_datetime(sample)
                 return "datetime"
             except Exception:
                 pass
