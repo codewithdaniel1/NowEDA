@@ -216,4 +216,4 @@ NowEDA/
 
 ## Author
 
-**Daniel Peng** — [danielpeng@osiris.cyber.nyu.edu](mailto:)
+**Daniel Peng** — [danielpeng95@gmail.com]
