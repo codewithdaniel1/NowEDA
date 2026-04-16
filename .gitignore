@@ -1,0 +1,22 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Build artifacts
+*.egg-info/
+UNKNOWN.egg-info/
+dist/
+build/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# macOS
+.DS_Store
+
+# Generated reports
+examples/report.html
+examples/report.json

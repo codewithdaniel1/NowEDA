@@ -1,0 +1,26 @@
+id,name,email,age,salary,department,join_date,score,flag,encoded_field
+1,Alice Johnson,alice@example.com,32,85000,Engineering,2021-03-15,91.2,0,aGVsbG8=
+2,Bob Smith,bob.smith@company.org,45,120000,Finance,2019-07-01,78.5,1,d29ybGQ=
+3,Carol White,,28,62000,Marketing,2022-01-10,88.0,0,dGVzdA==
+4,David Brown,david@example.com,51,145000,Engineering,2017-11-22,95.1,1,Zm9v
+5,Eva Martinez,eva@example.com,23,48000,Marketing,2023-05-30,72.3,0,YmFy
+6,Frank Lee,,39,,Finance,2020-09-14,,1,YmF6
+7,Grace Kim,grace@company.org,34,95000,Engineering,2021-06-01,84.7,0,cXV4
+8,Henry Adams,,60,200000,Executive,2010-04-20,99.0,1,
+9,,henry2@example.com,29,55000,Marketing,,76.5,0,
+10,Iris Clark,iris@example.com,37,78000,Finance,2019-12-05,82.1,1,
+11,Jack Wilson,jack@example.com,42,110000,Engineering,2018-08-18,89.4,0,
+12,Karen Davis,,55,160000,Executive,2015-02-28,,1,
+13,Leo Martinez,leo@example.com,26,51000,Marketing,2023-01-15,70.0,0,
+14,Mia Taylor,mia@example.com,31,82000,Engineering,2021-09-10,93.5,1,
+15,Noah Anderson,,47,130000,Finance,2016-05-05,80.2,0,
+16,Olivia Thomas,olivia@company.org,24,47000,Marketing,2024-01-20,68.9,1,
+17,Peter Jackson,peter@example.com,58,175000,Executive,2012-10-31,97.3,0,
+18,Quinn Moore,,35,88000,Engineering,2020-03-01,86.6,1,
+19,Rachel White,rachel@example.com,27,59000,Marketing,2022-11-07,74.8,0,
+20,Sam Harris,sam@example.com,43,115000,Finance,2018-01-25,81.0,1,
+21,Tina Brown,,19,32000,Marketing,2024-06-01,65.0,0,
+22,Uma Patel,uma@example.com,36,92000,Engineering,2020-07-14,90.1,1,
+23,Victor Cruz,victor@company.org,52,140000,Finance,2014-09-09,77.3,0,
+24,Wendy Scott,,29,61000,Marketing,2023-03-20,71.5,1,
+25,Xander Green,xander@example.com,44,118000,Engineering,2017-04-11,88.9,0,
