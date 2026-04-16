@@ -1,0 +1,98 @@
+site_name: NowEDA
+site_description: Automated EDA with insights, scoring, and security-aware detection — built as a native pandas extension.
+site_author: Daniel Peng
+site_url: https://codewithdaniel1.github.io/NowEDA/
+
+repo_name: codewithdaniel1/NowEDA
+repo_url: https://github.com/codewithdaniel1/NowEDA
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: installation.md
+    - Quick Start: quickstart.md
+  - User Guide:
+    - Reading Data: user-guide/reading-data.md
+    - The NowEDA Accessor: user-guide/accessor.md
+    - Understanding Reports: user-guide/reports.md
+  - Plugins:
+    - Overview: plugins/overview.md
+    - Schema Inference: plugins/schema.md
+    - Descriptive Stats: plugins/stats.md
+    - Missing Values: plugins/missing.md
+    - Duplicates & Constants: plugins/duplicates.md
+    - Correlations: plugins/correlation.md
+    - Outlier Detection: plugins/outliers.md
+    - PII Detection: plugins/pii.md
+    - Encoding Detection: plugins/encoding.md
+    - Writing Custom Plugins: plugins/custom.md
+  - Scoring System: scoring.md
+  - Insights Engine: insights.md
+  - CLI Reference: cli.md
+  - HTML Reports: html-reports.md
+  - Examples:
+    - Basic EDA Workflow: examples/basic-eda.md
+    - Security & PII Audit: examples/security-audit.md
+    - Custom Plugin: examples/custom-plugin.md
+    - Multiple Formats: examples/multi-format.md
+  - API Reference: api-reference.md
+  - FAQ: faq.md
+  - Changelog: changelog.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/codewithdaniel1/NowEDA
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/noweda/
+
+copyright: Copyright &copy; 2026 Daniel Peng

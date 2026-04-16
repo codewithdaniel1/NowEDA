@@ -22,3 +22,6 @@ __pycache__/
 # Generated reports
 examples/report.html
 examples/report.json
+
+# MkDocs build output
+site/
