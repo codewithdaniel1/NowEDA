@@ -25,3 +25,7 @@ examples/report.json
 
 # MkDocs build output
 site/
+
+# Jupyter notebooks (local playground only — never commit)
+*.ipynb
+.ipynb_checkpoints/
