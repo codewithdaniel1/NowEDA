@@ -8,6 +8,8 @@ env/
 UNKNOWN.egg-info/
 dist/
 build/
+*.whl
+*.tar.gz
 
 # Python cache
 __pycache__/
