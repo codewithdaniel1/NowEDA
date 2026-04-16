@@ -150,3 +150,63 @@ def rare_category_detection(col, threshold=0.01):
     rare = value_counts[value_counts < threshold]
 
     return rare.to_dict() if len(rare) > 0 else {}
+
+
+def assess_column_quality(col, role="unknown"):
+    """
+    Assess the quality of a single column and return a summary.
+
+    Returns: (quality_status, issues_list)
+    where quality_status is '✓ Good', '⚠ Check', or '✗ Issue'
+    """
+    issues = []
+    col_clean = col.dropna()
+    n_total = len(col)
+    n_missing = col.isna().sum()
+    missing_pct = (n_missing / n_total * 100) if n_total > 0 else 0
+
+    # Check for high missingness
+    if missing_pct > 50:
+        issues.append(f"High missingness ({missing_pct:.0f}%)")
+    elif missing_pct > 20:
+        issues.append(f"Moderate missingness ({missing_pct:.0f}%)")
+    elif missing_pct > 0:
+        issues.append(f"Minor missingness ({missing_pct:.1f}%)")
+
+    # Check for constant columns
+    if col.nunique() <= 1:
+        issues.append("Constant or single value")
+
+    # Check for high cardinality categoricals
+    if role == "categorical" and col.nunique() > 50:
+        issues.append(f"High cardinality ({col.nunique()} unique)")
+
+    # Check for skewness in numeric
+    if col.dtype.kind in ('i', 'u', 'f') and len(col_clean) > 2:
+        skewness = col_clean.skew()
+        if abs(skewness) > 2:
+            issues.append(f"Highly skewed ({skewness:.2f})")
+        elif abs(skewness) > 1:
+            issues.append(f"Moderately skewed ({skewness:.2f})")
+
+    # Check for outliers
+    if col.dtype.kind in ('i', 'u', 'f') and len(col_clean) > 3:
+        Q1 = col_clean.quantile(0.25)
+        Q3 = col_clean.quantile(0.75)
+        IQR = Q3 - Q1
+        if IQR > 0:
+            outliers = col_clean[(col_clean < Q1 - 1.5*IQR) | (col_clean > Q3 + 1.5*IQR)]
+            if len(outliers) > 0:
+                outlier_pct = (len(outliers) / len(col_clean) * 100)
+                if outlier_pct > 10:
+                    issues.append(f"Outliers detected ({outlier_pct:.1f}%)")
+
+    # Determine status
+    if len(issues) == 0:
+        return ("✓ Good", [])
+    elif len(issues) == 1 and missing_pct > 0 and missing_pct <= 5:
+        return ("✓ Good", issues)  # Minor issue only
+    elif len(issues) <= 2:
+        return ("⚠ Check", issues)
+    else:
+        return ("✗ Issue", issues)

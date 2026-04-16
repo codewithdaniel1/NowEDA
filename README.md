@@ -6,61 +6,126 @@ NowEDA is a lightweight, modular Python framework that turns any dataset into in
 
 ---
 
-## ML-Ready EDA — One Call Does It All
+## Three Powerful Methods — Everything You Need for ML-Ready EDA
 
-NowEDA now does **everything** an ML engineer needs before modeling:
+NowEDA provides three fully automated methods that do **everything** an ML engineer needs before modeling:
 
-### `df.noweda.statsall()` — Complete Statistical Report + Algorithm Recommendations
-Prints a rich, colour-coded report with:
+`import noweda as eda`
+
+### 1. `df.eda.statsall()` — Complete Statistical Analysis Report
+
+Prints a rich, colour-coded report with comprehensive data profiling:
 
 **Data Profile:**
-- **Scores** — data quality, risk, model readiness
-- **Column analysis** — dtypes, roles, diversity metrics
-- **Numeric stats** — mean, std, quartiles, skewness
-- **Categorical stats** — cardinality, diversity, frequency distribution
-- **Insights** — human-readable findings
+- **Scores** — data quality (0–100), risk level, model readiness (0–100)
+- **Column analysis** — dtypes, inferred roles with confidence scores, diversity metrics
+- **Column quality summary** — ✓ Good / ⚠ Check / ✗ Issue flags for each column
+- **Numeric stats** — mean, std, quartiles, skewness, outlier counts
+- **Categorical stats** — cardinality, balance (entropy-based diversity), top values with %
+- **Temporal analysis** — auto-detects datetime columns, infers frequency (daily/weekly/monthly), tests stationarity, detects seasonality
+- **Insights** — human-readable findings about data quality, patterns, issues
 
 **Preprocessing Guidance:**
-- ⚠️ **Multicollinearity detection** (VIF > 5) with actionable recommendations
-- 🔧 **Scaling recommendations** (StandardScaler, MinMaxScaler)
-- 📊 **Transformation suggestions** (log, sqrt for skewed data)
+- ⚠️ **Multicollinearity detection** (VIF > 5) with code snippets
+- 🔧 **Scaling recommendations** with `StandardScaler` and `MinMaxScaler` code
+- 📊 **Transformation suggestions** (log, sqrt for skewed data) with examples
 - 🚨 **Cardinality warnings** (high-cardinality categoricals)
 - 🏷️ **Rare category detection** (<1% frequency)
-- ❌ **Missing data strategy** (impute vs drop)
+- ❌ **Missing data strategy** (impute vs drop) with code examples
 
-**🤖 ML Algorithm Recommendations:**
-- **Supervised Learning** — Recommends (Linear Regression, Random Forest, XGBoost, SVM, KNN, Neural Networks, Naive Bayes) with:
-  - ⭐ Star ratings based on data fit
-  - ✓ Why each algorithm suits your data
-  - ✗ When to avoid it and why
-- **Unsupervised Learning** — Recommends (K-Means, DBSCAN, Hierarchical Clustering, PCA/t-SNE/UMAP) with reasoning
-- **Data Preprocessing Pipeline** — Step-by-step instructions
+### 2. `df.eda.mlall()` — ML Algorithm Recommendations & Preprocessing Pipeline
 
-### `df.noweda.vizall()` — Advanced ML Visualizations
-Auto-renders 7+ types of charts:
-- Histograms + KDE for numeric columns
-- Bar charts with % labels for categoricals
-- **Box plots** — numeric distributions by categorical (spot relationships)
-- **Feature variance ranking** — importance at a glance
-- **Pair plots** — top correlated features with regression lines
-- **Categorical heatmap** — association strength (Cramér's V)
-- Correlation heatmap, missing value bars, time-series
+Provides expert guidance on which algorithms to try first, with data-specific reasoning:
+
+**🤖 Supervised Learning (Classification & Regression)**
+- **Supervised algorithms** — Linear/Logistic Regression, Random Forest, Gradient Boosting (XGBoost), SVM, KNN, Neural Networks, Naive Bayes
+- **Rating system** — ⭐ (1–5 stars) based on your data characteristics
+- **Reasoning** — ✓ Why it fits + ✗ When to avoid + ⚠ Before fitting warnings
+- **Class imbalance detection** — ⚠️ Alerts if target variable is imbalanced with actionable solutions (SMOTE, stratified split, class weights)
+
+**📊 Unsupervised Learning (Clustering & Dimensionality Reduction)**
+- **Clustering** — K-Means, DBSCAN, Hierarchical Clustering with data-specific ratings
+- **Reduction** — PCA, t-SNE/UMAP with dimensionality guidance
+- **Anomaly Detection** — Isolation Forest for outlier scoring
+
+**🔧 Multicollinearity Guidance**
+- Detects high correlations (|r| > 0.85) and explains the problem
+- Provides three solutions: (1) Drop correlated features, (2) Use PCA, (3) Use Ridge/Lasso
+
+**📋 Data Preprocessing Pipeline**
+- Step-by-step instructions tailored to your dataset
+- Code snippets for imputation, encoding, scaling, and handling outliers
+- Handles special cases: high missingness, skewness, outliers, multicollinearity
+
+### 3. `df.eda.vizall()` — Advanced Auto-Visualizations
+
+Auto-renders 7+ types of publication-quality charts (no matplotlib code needed):
+
+- **Histograms + KDE** — Numeric distributions with density overlays
+- **Bar charts** — Top categorical values with percentage labels
+- **Box plots** — Numeric distributions by categorical features (spot relationships)
+- **Feature variance ranking** — Horizontal bar chart showing information content
+- **Pair plots** — Top correlated feature pairs with regression lines
+- **Categorical association heatmap** — Cramér's V strength between categorical columns
+- **Missing data heatmap** — Correlation patterns in missingness (reveals if missingness is random or correlated)
+- **Correlation heatmap** — Pearson correlations between all numeric columns
+- **Time-series plots** — Line charts for datetime columns + numeric trends
+
+### 4. `df.eda.profile_column(column_name)` — Deep Dive Into a Single Column
+
+Detailed analysis of one column for understanding distributions and transformations:
+
+- **Type information** — Inferred data type and role with confidence
+- **Distribution analysis** — Detects if data is symmetric, moderately skewed, or highly skewed
+- **Transformation recommendations** — Suggests log/sqrt transforms with statistical justification
+- **Outlier explanation** — Quantifies outliers as % of data
+- **Cardinality insights** — For categorical columns, shows all/top values with frequencies
+
+Example:
+```python
+df.eda.profile_column('age')      # Deep dive into 'age' column
+df.eda.profile_column('category') # Deep dive into 'category' column
+```
+
+### 5. `df.eda.compare(other_df)` — Compare Two Datasets
+
+Detect schema drift and data distribution changes between datasets:
+
+- **Dimension changes** — Rows and columns added/removed
+- **Score regression** — Data quality, model readiness, and risk changes
+- **Schema drift** — Columns added/removed, column roles changed
+- **Risk changes** — New PII detected, risks added/removed
+
+Example:
+```python
+df_train.eda.compare(df_test)     # Check for train/test drift
+df_v1.eda.compare(df_v2)          # Detect schema changes between versions
+```
+
+---
 
 ## Features
 
 | Feature | Description |
 |---|---|
-| Universal ingestion | CSV, Excel, JSON, XML, HTML — 28 formats |
-| Native pandas accessor | `df.noweda.*` — feels like pandas |
-| **ML Preprocessing Guide** | Multicollinearity (VIF), scaling recommendations, transformations, cardinality warnings |
-| **Advanced Visualizations** | Box plots, pair plots, feature variance ranking, categorical heatmaps |
+| **Three powerful methods** | `statsall()` full EDA, `vizall()` auto-charts, `mlall()` algorithm recommendations |
+| **Bonus methods** | `profile_column()` for deep dives, `compare()` for dataset drift detection |
+| Universal ingestion | CSV, Excel, JSON, XML, HTML, Parquet, Feather — 28 formats |
+| Native pandas accessor | `df.eda.*` — feels like pandas |
+| **ML-Ready Analysis** | Algorithm ratings, class imbalance detection, preprocessing pipeline with code |
+| **Advanced Visualizations** | 9+ auto-chart types, missing data heatmap, time-series plots |
+| **Confidence scores** | Data type inference confidence per column |
+| **Column quality flags** | ✓ Good / ⚠ Check / ✗ Issue for every column |
+| **Temporal analysis** | Datetime detection, frequency inference, stationarity & seasonality tests |
 | Plugin architecture | Every analysis is a swappable plugin |
-| Schema inference | Auto-detects IDs, categoricals, datetimes, text |
-| Data quality scoring | 0–100 quality + model-readiness score |
-| Risk scoring | PII and encoding risk level |
+| Schema inference | Auto-detects IDs, categoricals, datetimes, text with confidence scores |
+| Data quality scoring | 0–100 quality + model-readiness score + risk level |
+| Multicollinearity detection | VIF calculation with actionable recommendations + code |
+| Class imbalance detection | Identifies imbalanced classes, suggests SMOTE/class_weight |
+| Correlation explanations | Explains why high correlations are problematic + solutions |
 | PII detection | Email addresses + extensible patterns |
 | Encoding detection | Base64 and obfuscation signals |
-| Outlier detection | IQR-based, per numeric column |
+| Outlier detection | IQR-based, per numeric column with % quantification |
 | Duplicate detection | Exact row duplicates + constant columns |
 | Categorical diversity | Entropy-based balance metric per column |
 | Actionable insights | Human-readable text, not just numbers |
@@ -98,9 +163,13 @@ print(df.eda.summary())    # raw plugin results
 report = df.eda.report()   # full structured dict
 
 # Power methods
-df.eda.statsall()          # full rich report: dtypes + stats + scores + insights
-df.eda.vizall()            # auto-render best charts for every column
-df.eda.mlall()             # ML algorithm recommendations + preprocessing pipeline
+df.eda.statsall()                    # full rich report: dtypes + stats + scores + insights
+df.eda.vizall()                      # auto-render best charts for every column
+df.eda.mlall()                       # ML algorithm recommendations + preprocessing pipeline
+
+# Advanced methods
+df.eda.profile_column('age')         # deep dive into a single column
+df.eda.compare(df_test)              # detect schema drift between datasets
 ```
 
 ### All supported formats
@@ -224,14 +293,17 @@ python -m pytest tests/ -v
 ```
 NowEDA/
 ├── noweda/
-│   ├── __init__.py          # exposes noweda.read()
-│   ├── io.py                # file ingestion (all formats)
-│   ├── accessor.py          # df.noweda.* pandas accessor
+│   ├── __init__.py               # exposes noweda.read()
+│   ├── io.py                     # file ingestion (all formats)
+│   ├── accessor.py               # df.eda.* pandas accessor (5 methods)
+│   ├── ml_utils.py               # ML utility functions (VIF, cardinality, etc.)
+│   ├── ml_recommendations.py     # Algorithm recommendations + preprocessing pipeline
+│   ├── temporal_utils.py         # Temporal analysis (datetime, stationarity, seasonality)
 │   ├── core/
-│   │   └── engine.py        # orchestrates plugins → scorer → insights
+│   │   └── engine.py             # orchestrates plugins → scorer → insights
 │   ├── plugins/
 │   │   ├── base.py
-│   │   ├── schema.py
+│   │   ├── schema.py             # with confidence scores
 │   │   ├── stats.py
 │   │   ├── missing.py
 │   │   ├── duplicates.py
@@ -249,7 +321,8 @@ NowEDA/
 ├── examples/
 │   └── sample.csv
 ├── tests/
-│   └── test_basic.py
+│   ├── test_basic.py
+│   └── test_formats.py
 └── pyproject.toml
 ```
 
@@ -257,12 +330,22 @@ NowEDA/
 
 ## Roadmap
 
-- [ ] Visualization layer (histograms, correlation heatmap)
-- [ ] Dataset fingerprinting / hash-based change detection
+**Completed:**
+- [x] Visualization layer (9+ chart types including missing data heatmap)
+- [x] ML algorithm recommendations with data-specific ratings
+- [x] Class imbalance detection and guidance
+- [x] Temporal data analysis (stationarity, seasonality)
+- [x] Dataset comparison (drift detection)
+- [x] Column-level quality summaries
+- [x] Code snippets in preprocessing pipeline
+
+**Coming Soon:**
 - [ ] Additional PII patterns (phone, SSN, credit card)
 - [ ] Streaming / chunked ingestion for large files
 - [ ] PyPI publish
 - [ ] Web dashboard UI
+- [ ] Feature interaction detection
+- [ ] Correlation explanation for numeric features
 
 ---
 

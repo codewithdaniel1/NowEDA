@@ -3,8 +3,9 @@ from noweda.core.engine import AutoEDAEngine
 from noweda.plugins import default_plugins
 from noweda.ml_utils import (
     calculate_vif, cardinality_warning, rare_category_detection,
-    get_scaling_recommendation, get_transformation_suggestion
+    get_scaling_recommendation, get_transformation_suggestion, assess_column_quality
 )
+from noweda.temporal_utils import detect_temporal_columns, stationarity_test, detect_seasonality
 from noweda.ml_recommendations import (
     _profile, supervised_recommendations, unsupervised_recommendations,
     preprocessing_pipeline, format_recommendations
@@ -96,16 +97,20 @@ class NowEDAAccessor:
         h2("Column Types")
         col_w = max(len(c) for c in df.columns) + 2
         role_w = 20
-        print(f"  {'Column':<{col_w}} {'Dtype':<14} {'Role':<{role_w}} {'Unique':>8} {'Missing':>8}")
-        print(f"  {'-'*col_w} {'-'*14} {'-'*role_w} {'--------':>8} {'--------':>8}")
+        print(f"  {'Column':<{col_w}} {'Dtype':<14} {'Role':<{role_w}} {'Conf':>5} {'Unique':>8} {'Missing':>8}")
+        print(f"  {'-'*col_w} {'-'*14} {'-'*role_w} {'-----':>5} {'--------':>8} {'--------':>8}")
         for col in df.columns:
             dtype = str(df[col].dtype)
             role  = schema.get(col, {}).get("role", "unknown")
+            conf  = schema.get(col, {}).get("confidence", 1.0)
             uniq  = df[col].nunique()
             miss  = int(df[col].isna().sum())
             # Apply colour without breaking right-alignment
             miss_display = f"{_YELLOW}{miss:>8}{_RESET}" if miss > 0 else f"{miss:>8}"
-            print(f"  {col:<{col_w}} {dtype:<14} {role:<{role_w}} {uniq:>8} {miss_display}")
+            # Color confidence: high (>0.9) green, medium yellow, low red
+            conf_color = _GREEN if conf >= 0.9 else (_YELLOW if conf >= 0.75 else _RED)
+            conf_display = f"{conf_color}{conf:>5.2f}{_RESET}"
+            print(f"  {col:<{col_w}} {dtype:<14} {role:<{role_w}} {conf_display} {uniq:>8} {miss_display}")
 
         # ── Per-column stats ─────────────────────────────────────────────────
         h2("Descriptive Statistics")
@@ -171,6 +176,48 @@ class NowEDAAccessor:
                 print(f"  • {ins}")
         else:
             print("  No issues detected.")
+
+        # ── Column Quality Summary ────────────────────────────────────────────
+        h2("Column Quality Summary")
+        for col in df.columns:
+            role = schema.get(col, {}).get("role", "unknown")
+            status, issues = assess_column_quality(df[col], role)
+
+            # Color code status
+            if status.startswith("✓"):
+                status_colored = f"{_GREEN}{status}{_RESET}"
+            elif status.startswith("⚠"):
+                status_colored = f"{_YELLOW}{status}{_RESET}"
+            else:
+                status_colored = f"{_RED}{status}{_RESET}"
+
+            # Print column status
+            if issues:
+                issues_str = "; ".join(issues)
+                print(f"  {col:<{col_w}} {status_colored:>15}  ({issues_str})")
+            else:
+                print(f"  {col:<{col_w}} {status_colored}")
+
+        # ── Temporal Analysis ─────────────────────────────────────────────────
+        temporal = detect_temporal_columns(df)
+        if temporal:
+            h2("Temporal Data Analysis")
+            for col, (dtype, frequency, confidence) in temporal.items():
+                print(f"\n  {_BOLD}{col}{_RESET}")
+                print(f"    Type        : {dtype} (confidence: {confidence:.0%})")
+                print(f"    Frequency   : {frequency}")
+
+                # Test stationarity for numeric time series
+                if df[col].dtype.kind in ("i", "u", "f"):
+                    is_stat, p_val = stationarity_test(df[col])
+                    if is_stat is not None:
+                        status = f"{_GREEN}Stationary{_RESET}" if is_stat else f"{_YELLOW}Non-stationary{_RESET}"
+                        print(f"    Stationarity: {status} (p={p_val:.3f})")
+
+                    # Seasonality for longer series
+                    has_season, strength = detect_seasonality(df[col])
+                    if has_season or strength > 0:
+                        print(f"    Seasonality : {_YELLOW}Detected{_RESET} (strength={strength:.2f})" if has_season else f"    Seasonality : None (strength={strength:.2f})")
 
         # ── Plugin Summary ────────────────────────────────────────────────────
         h2("Plugin Summary")
@@ -454,6 +501,41 @@ class NowEDAAccessor:
             plt.show()
             figs_shown += 1
 
+        # ── Missing data correlation heatmap ──────────────────────────────────
+        if len(cols_with_missing) >= 2:
+            try:
+                import numpy as np
+                # Create binary matrix: 1 if missing, 0 if not
+                missing_matrix = df[cols_with_missing].isna().astype(int)
+                # Compute correlation between missing patterns
+                missing_corr = missing_matrix.corr()
+
+                if len(cols_with_missing) > 1:
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    cmap = matplotlib.colormaps.get_cmap("RdYlGn_r") if hasattr(matplotlib, "colormaps") else plt.cm.RdYlGn_r
+                    im = ax.imshow(missing_corr.values, cmap=cmap, aspect='auto', vmin=-1, vmax=1)
+                    plt.colorbar(im, ax=ax, label="Correlation in Missing Patterns")
+
+                    ax.set_xticks(range(len(cols_with_missing)))
+                    ax.set_yticks(range(len(cols_with_missing)))
+                    ax.set_xticklabels(cols_with_missing, rotation=45, ha='right', fontsize=9)
+                    ax.set_yticklabels(cols_with_missing, fontsize=9)
+
+                    # Annotate
+                    for i in range(len(cols_with_missing)):
+                        for j in range(len(cols_with_missing)):
+                            text = ax.text(j, i, f'{missing_corr.values[i, j]:.2f}',
+                                          ha="center", va="center",
+                                          color="black" if abs(missing_corr.values[i, j]) < 0.5 else "white",
+                                          fontsize=8)
+
+                    ax.set_title("Missing Data Patterns (Correlation)", fontsize=13, fontweight="bold")
+                    plt.tight_layout()
+                    plt.show()
+                    figs_shown += 1
+            except Exception:
+                pass
+
         # ── Datetime line plots ───────────────────────────────────────────────
         if datetime_cols and numeric_cols:
             dt_col = datetime_cols[0]
@@ -673,7 +755,218 @@ class NowEDAAccessor:
         print(f"{_BOLD}{_CYAN}{bar}{_RESET}")
 
         # Delegate formatting to format_recommendations
-        format_recommendations(supervised, unsupervised, pipeline,
+        format_recommendations(supervised, unsupervised, pipeline, profile,
                               _BOLD, _CYAN, _GREEN, _YELLOW, _RED, _RESET)
 
         print(f"{_CYAN}{'='*70}{_RESET}\n")
+
+    def profile_column(self, column_name):
+        """Deep dive into a single column's characteristics and recommendations.
+
+        Shows:
+          - Distribution type (normal, skewed, multimodal, etc.)
+          - Suggested transformations with statistical justification
+          - Outlier explanation
+          - Role confidence and alternative interpretations
+        """
+        self._ensure_analyzed()
+        df = self._df
+        report = self._report
+        results = report["results"]
+        stats = results.get("stats", {})
+        schema = results.get("schema", {})
+
+        if column_name not in df.columns:
+            print(f"Column '{column_name}' not found in DataFrame.")
+            return
+
+        col = df[column_name]
+        col_stats = stats.get(column_name, {})
+        col_schema = schema.get(column_name, {})
+
+        _BOLD  = "\033[1m"
+        _CYAN  = "\033[36m"
+        _GREEN = "\033[32m"
+        _YELLOW = "\033[33m"
+        _RED   = "\033[31m"
+        _RESET = "\033[0m"
+
+        print(f"\n{_BOLD}{_CYAN}{'='*70}{_RESET}")
+        print(f"{_BOLD}{_CYAN}  Column Profile: {column_name}{_RESET}")
+        print(f"{_BOLD}{_CYAN}{'='*70}{_RESET}\n")
+
+        # Basic Info
+        print(f"{_BOLD}Type Information:{_RESET}")
+        print(f"  Data Type       : {col_schema.get('dtype', 'unknown')}")
+        print(f"  Inferred Role   : {col_schema.get('role', 'unknown')} (confidence: {col_schema.get('confidence', 'N/A')})")
+        print(f"  Unique Values   : {col.nunique()}")
+        print(f"  Missing         : {col.isna().sum()} ({col.isna().sum() / len(col) * 100:.1f}%)")
+
+        # Numeric-specific analysis
+        if col.dtype.kind in ('i', 'u', 'f'):
+            print(f"\n{_BOLD}Numeric Statistics:{_RESET}")
+            print(f"  Mean            : {col_stats.get('mean', 'N/A'):.4g}")
+            print(f"  Median          : {col_stats.get('median', 'N/A'):.4g}")
+            print(f"  Std Dev         : {col_stats.get('std', 'N/A'):.4g}")
+            print(f"  Min             : {col_stats.get('min', 'N/A'):.4g}")
+            print(f"  Max             : {col_stats.get('max', 'N/A'):.4g}")
+            print(f"  Q1 (25%)        : {col_stats.get('q25', 'N/A'):.4g}")
+            print(f"  Q3 (75%)        : {col_stats.get('q75', 'N/A'):.4g}")
+
+            # Distribution insights
+            skewness = col_stats.get('skewness', 0)
+            print(f"\n{_BOLD}Distribution:{_RESET}")
+            if abs(skewness) < 0.5:
+                print(f"  Shape           : Symmetric/Normal-like")
+                print(f"  Skewness        : {skewness:.3f} (minimal skew)")
+            elif abs(skewness) < 1:
+                print(f"  Shape           : Moderately skewed")
+                print(f"  Skewness        : {skewness:.3f}")
+                if skewness > 0:
+                    print(f"  Direction       : Right-skewed (long tail right)")
+                    print(f"  Recommendation  : Try sqrt or log transformation")
+                else:
+                    print(f"  Direction       : Left-skewed (long tail left)")
+                    print(f"  Recommendation  : Try reflecting then log/sqrt")
+            else:
+                print(f"  Shape           : Highly skewed")
+                print(f"  Skewness        : {skewness:.3f}")
+                if skewness > 0:
+                    print(f"  Direction       : Right-skewed (strong positive skew)")
+                else:
+                    print(f"  Direction       : Left-skewed (strong negative skew)")
+                print(f"  Recommendation  : {_YELLOW}log1p transform strongly recommended{_RESET}")
+
+        # Categorical-specific analysis
+        elif col.dtype == object or str(col.dtype) == "category":
+            print(f"\n{_BOLD}Categorical Statistics:{_RESET}")
+            print(f"  Top Value       : {col_stats.get('top_value', 'N/A')}")
+            print(f"  Frequency       : {col_stats.get('top_freq', 'N/A')} ({col_stats.get('top_freq', 0) / len(col) * 100:.1f}%)")
+
+            value_counts = col.value_counts()
+            if len(value_counts) <= 10:
+                print(f"\n{_BOLD}All Values:{_RESET}")
+                for val, count in value_counts.items():
+                    pct = count / len(col) * 100
+                    print(f"  {str(val):<20} : {count:>5} ({pct:>5.1f}%)")
+            else:
+                print(f"\n{_BOLD}Top 10 Values:{_RESET}")
+                for val, count in value_counts.head(10).items():
+                    pct = count / len(col) * 100
+                    print(f"  {str(val):<20} : {count:>5} ({pct:>5.1f}%)")
+                print(f"  ... and {len(value_counts) - 10} more unique values")
+
+            # Cardinality warning
+            if col.nunique() > 50:
+                print(f"\n{_YELLOW}⚠ High Cardinality Warning:{_RESET}")
+                print(f"  This column has {col.nunique()} unique values.")
+                print(f"  One-hot encoding will create many features.")
+                print(f"  Consider: Target Encoding, Frequency Encoding, or dropping low-frequency values")
+
+        print(f"\n{_CYAN}{'='*70}{_RESET}\n")
+
+    def compare(self, other_df):
+        """Compare this dataset with another dataset.
+
+        Shows:
+          - Schema differences (new/removed/changed columns)
+          - Statistic changes (mean, std, range shifts)
+          - Data quality regression
+          - New risks or PII patterns
+        """
+        self._ensure_analyzed()
+
+        if not isinstance(other_df, type(self._df)):
+            print("Error: other_df must be a pandas DataFrame")
+            return
+
+        df1 = self._df
+        df2 = other_df
+
+        # Get reports for both
+        from noweda.core.engine import AutoEDAEngine
+        from noweda.plugins import default_plugins
+
+        engine = AutoEDAEngine(default_plugins())
+        report1 = self._report
+        report2 = engine.run_df(df2)
+
+        _BOLD  = "\033[1m"
+        _CYAN  = "\033[36m"
+        _GREEN = "\033[32m"
+        _YELLOW = "\033[33m"
+        _RED   = "\033[31m"
+        _RESET = "\033[0m"
+
+        def h1(text):
+            bar = "=" * 70
+            print(f"\n{_BOLD}{_CYAN}{bar}{_RESET}")
+            print(f"{_BOLD}{_CYAN}  {text}{_RESET}")
+            print(f"{_BOLD}{_CYAN}{bar}{_RESET}")
+
+        h1("Dataset Comparison")
+
+        # Basic dimensions
+        print(f"\n{_BOLD}Dataset Dimensions:{_RESET}")
+        print(f"  Dataset 1 : {len(df1):>6,} rows × {len(df1.columns):>3} columns")
+        print(f"  Dataset 2 : {len(df2):>6,} rows × {len(df2.columns):>3} columns")
+        if len(df2) != len(df1):
+            change = len(df2) - len(df1)
+            change_pct = change / len(df1) * 100 if len(df1) > 0 else 0
+            color = _GREEN if change >= 0 else _RED
+            print(f"  Change    : {color}{change:+,} ({change_pct:+.1f}%){_RESET}")
+
+        # Score comparison
+        print(f"\n{_BOLD}Score Changes:{_RESET}")
+        scores1 = report1.get("scores", {})
+        scores2 = report2.get("scores", {})
+
+        for score_name in ["data_quality", "model_readiness", "risk"]:
+            s1 = scores1.get(score_name, 0)
+            s2 = scores2.get(score_name, 0)
+            change = s2 - s1
+            color = _GREEN if (score_name != "risk" and change > 0) or (score_name == "risk" and change < 0) else _RED
+            print(f"  {score_name:<15} : {s1:>3} → {s2:>3}  {color}{change:+}  {_RESET}")
+
+        # Schema changes
+        schema1 = report1.get("results", {}).get("schema", {})
+        schema2 = report2.get("results", {}).get("schema", {})
+
+        cols1 = set(schema1.keys())
+        cols2 = set(schema2.keys())
+
+        if cols1 != cols2:
+            print(f"\n{_BOLD}Schema Changes:{_RESET}")
+            removed = cols1 - cols2
+            added = cols2 - cols1
+            if removed:
+                print(f"  {_RED}Removed:{_RESET} {', '.join(sorted(removed))}")
+            if added:
+                print(f"  {_GREEN}Added:{_RESET} {', '.join(sorted(added))}")
+
+        # Role changes for common columns
+        role_changes = {}
+        for col in cols1 & cols2:
+            role1 = schema1.get(col, {}).get("role")
+            role2 = schema2.get(col, {}).get("role")
+            if role1 != role2:
+                role_changes[col] = (role1, role2)
+
+        if role_changes:
+            print(f"\n{_BOLD}Column Role Changes:{_RESET}")
+            for col, (r1, r2) in role_changes.items():
+                print(f"  {col:<20} : {r1} → {r2}")
+
+        # PII comparison
+        pii1 = report1.get("results", {}).get("pii", {})
+        pii2 = report2.get("results", {}).get("pii", {})
+        if pii1 != pii2:
+            print(f"\n{_BOLD}PII Detection Changes:{_RESET}")
+            new_pii = set(pii2.keys()) - set(pii1.keys())
+            if new_pii:
+                print(f"  {_RED}New PII detected in:{_RESET} {', '.join(sorted(new_pii))}")
+            removed_pii = set(pii1.keys()) - set(pii2.keys())
+            if removed_pii:
+                print(f"  {_GREEN}PII removed from:{_RESET} {', '.join(sorted(removed_pii))}")
+
+        print(f"\n{_CYAN}{'='*70}{_RESET}\n")

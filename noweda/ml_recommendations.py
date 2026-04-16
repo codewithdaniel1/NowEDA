@@ -51,6 +51,18 @@ def _profile(df, stats, schema, scores, results):
     total_outliers = sum(outliers.values()) if outliers else 0
     outlier_heavy = total_outliers > (n_rows * 0.05)
 
+    # Class imbalance detection: check all categorical columns
+    imbalanced_cols = {}
+    for c in cat_cols:
+        value_counts = df[c].value_counts(normalize=True)
+        if len(value_counts) > 1:
+            max_freq = value_counts.iloc[0]
+            # Imbalanced if dominant class is >70% or <30% of data
+            if max_freq > 0.70 or max_freq < 0.30:
+                imbalanced_cols[c] = max_freq
+
+    has_imbalance = len(imbalanced_cols) > 0
+
     return {
         "n_rows": n_rows,
         "n_cols": n_cols,
@@ -71,6 +83,8 @@ def _profile(df, stats, schema, scores, results):
         "high_missing": max_missing_pct > 0.20,
         "high_card_cats": high_card_cats,
         "outlier_heavy": outlier_heavy,
+        "has_imbalance": has_imbalance,
+        "imbalanced_cols": imbalanced_cols,
         "dq": scores.get("data_quality", 0),
         "model_readiness": scores.get("model_readiness", 0),
         "risk": scores.get("risk", 0),
@@ -110,6 +124,10 @@ def supervised_recommendations(p):
         score -= 0.5
         reasons_against.append("Missing data (>20%) — impute before fitting")
         warnings.append("Impute or use SimpleImputer; linear models fail on NaN")
+    if p["has_imbalance"]:
+        score -= 0.5
+        reasons_against.append("Class imbalance detected — use class_weight='balanced' or SMOTE")
+        warnings.append("Set class_weight='balanced' in LogisticRegression() or resample with SMOTE")
 
     recs.append({
         "name": "Linear / Logistic Regression",
@@ -520,29 +538,47 @@ def preprocessing_pipeline(p, df):
         steps.append("2. HANDLE MISSING DATA:")
         steps.append("   • Columns with >50% missing → consider dropping entirely")
         steps.append("   • Numeric columns         → median imputation (SimpleImputer)")
+        steps.append("   • Code: from sklearn.impute import SimpleImputer")
+        steps.append("           imputer = SimpleImputer(strategy='median')")
+        steps.append("           X_imputed = imputer.fit_transform(X[numeric_cols])")
         steps.append("   • Categorical columns      → mode imputation or 'Unknown' category")
+        steps.append("   • Code: X[cat_cols] = X[cat_cols].fillna('Unknown')")
         steps.append("   • Advanced option          → IterativeImputer (MICE) for correlated features")
     elif p["max_missing_pct"] > 0:
         steps.append("2. HANDLE MISSING DATA: Impute with median (numeric) / mode (categorical)")
+        steps.append("   • Code: X = X.fillna(X.median(numeric_only=True))")
+        steps.append("           X[cat_cols] = X[cat_cols].fillna(X[cat_cols].mode().iloc[0])")
 
     # Step 3: Encode categoricals
     if p["n_categorical"] > 0:
         if p["high_card_cats"]:
             steps.append(f"3. ENCODE CATEGORICALS:")
             steps.append(f"   • Low cardinality (<10 unique)  → One-Hot Encoding (pd.get_dummies)")
-            steps.append(f"   • High cardinality columns {[c[:15] for c in p['high_card_cats'][:3]]} → Target Encoding or Frequency Encoding")
+            steps.append(f"   • Code: X = pd.get_dummies(X, columns=[low_card_cols], drop_first=True)")
+            steps.append(f"   • High cardinality {[c[:15] for c in p['high_card_cats'][:3]]} → Target Encoding or Frequency Encoding")
+            steps.append(f"   • Code: from category_encoders import TargetEncoder")
+            steps.append(f"           encoder = TargetEncoder()")
+            steps.append(f"           X[high_card_cols] = encoder.fit_transform(X[high_card_cols], y)")
         else:
             steps.append("3. ENCODE CATEGORICALS: One-Hot Encoding (pd.get_dummies or sklearn OneHotEncoder)")
+            steps.append("   • Code: X = pd.get_dummies(X, drop_first=True)")
 
     # Step 4: Scale
     if p["mostly_numeric"] or p["n_numeric"] > 0:
         if p["n_skewed"] > 0:
             steps.append(f"4. TRANSFORM THEN SCALE:")
             steps.append(f"   • {p['n_skewed']} skewed column(s) → apply np.log1p() first")
+            steps.append(f"   • Code: import numpy as np; X_skewed = np.log1p(X[skewed_cols])")
             steps.append(f"   • Then scale all numeric features with StandardScaler")
+            steps.append(f"   • Code: from sklearn.preprocessing import StandardScaler")
+            steps.append(f"           scaler = StandardScaler()")
+            steps.append(f"           X_scaled = scaler.fit_transform(X)")
             steps.append(f"   • Note: Tree models (RF, XGBoost) do NOT need scaling")
         else:
             steps.append("4. SCALE NUMERIC FEATURES: StandardScaler (zero mean, unit variance)")
+            steps.append("   • Code: from sklearn.preprocessing import StandardScaler")
+            steps.append("           scaler = StandardScaler()")
+            steps.append("           X_scaled = scaler.fit_transform(X)")
             steps.append("   • Note: Tree models (RF, XGBoost) do NOT need scaling")
 
     # Step 5: Handle multicollinearity
@@ -575,7 +611,7 @@ def preprocessing_pipeline(p, df):
 
 # ─── Formatter ──────────────────────────────────────────────────────────────
 
-def format_recommendations(supervised, unsupervised, pipeline,
+def format_recommendations(supervised, unsupervised, pipeline, profile,
                             _BOLD, _CYAN, _GREEN, _YELLOW, _RED, _RESET):
     """Print the full recommendation block to stdout."""
     W = 70
@@ -583,6 +619,21 @@ def format_recommendations(supervised, unsupervised, pipeline,
     def rule(title):
         print(f"\n  {_BOLD}{title}{_RESET}")
         print(f"  {'─'*62}")
+
+    # ── Data Warnings ───────────────────────────────────────────────────────
+    rule("⚠ Important Data Characteristics")
+    if profile.get("has_imbalance"):
+        print(f"\n  {_YELLOW}Class Imbalance Detected:{_RESET}")
+        for col, freq in profile["imbalanced_cols"].items():
+            print(f"    • {col}: Dominant class is {freq:.0%}")
+        print(f"    → Use stratified train/test split")
+        print(f"    → Consider SMOTE, class_weight='balanced', or threshold tuning")
+    if profile.get("n_skewed", 0) > 0:
+        print(f"\n  {_YELLOW}Skewed Features Detected ({profile['n_skewed']}):{_RESET}")
+        print(f"    → Apply log/sqrt transformation before modeling")
+    if profile.get("high_missing"):
+        print(f"\n  {_YELLOW}High Missingness (>20%):{_RESET}")
+        print(f"    → Use imputation strategy: median for numeric, mode for categorical")
 
     # ── Supervised ──────────────────────────────────────────────────────
     rule("Supervised Learning (Classification & Regression)")
@@ -633,6 +684,20 @@ def format_recommendations(supervised, unsupervised, pipeline,
                 print(f"      → {w}")
 
         print(f"  {_CYAN}ℹ  {rec['note']}{_RESET}")
+
+    # ── Correlation Insights ────────────────────────────────────────────
+    if profile.get("has_high_corr"):
+        rule("Multicollinearity: High Correlations Detected (|r| > 0.85)")
+        print(f"  {_YELLOW}⚠ Problem:{_RESET}")
+        print(f"    Highly correlated features can:")
+        print(f"    • Inflate model coefficients in linear models")
+        print(f"    • Make feature importance hard to interpret")
+        print(f"    • Cause overfitting and instability")
+        print(f"  {_GREEN}Solutions:{_RESET}")
+        print(f"    1. Drop one from each correlated pair")
+        print(f"    2. Combine into PCA components (for linear models)")
+        print(f"    3. Use Ridge/Lasso regression (automatic handling)")
+        print(f"    4. Tree models (RF, XGBoost) are naturally robust to multicollinearity")
 
     # ── Preprocessing Pipeline ──────────────────────────────────────────
     rule("Recommended Preprocessing Pipeline (in order)")
