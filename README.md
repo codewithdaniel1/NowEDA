@@ -26,33 +26,33 @@ Prints a rich, colour-coded report with comprehensive data profiling:
 - **Insights** — human-readable findings about data quality, patterns, issues
 
 **Preprocessing Guidance:**
-- ⚠️ **Multicollinearity detection** (VIF > 5) with code snippets
-- 🔧 **Scaling recommendations** with `StandardScaler` and `MinMaxScaler` code
-- 📊 **Transformation suggestions** (log, sqrt for skewed data) with examples
-- 🚨 **Cardinality warnings** (high-cardinality categoricals)
-- 🏷️ **Rare category detection** (<1% frequency)
-- ❌ **Missing data strategy** (impute vs drop) with code examples
+- **Multicollinearity detection** (VIF > 5) with code snippets
+- **Scaling recommendations** with `StandardScaler` and `MinMaxScaler` code
+- **Transformation suggestions** (log, sqrt for skewed data) with examples
+- **Cardinality warnings** (high-cardinality categoricals)
+- **Rare category detection** (<1% frequency)
+- **Missing data strategy** (impute vs drop) with code examples
 
 ### 2. `df.eda.mlall()` — ML Algorithm Recommendations & Preprocessing Pipeline
 
 Provides expert guidance on which algorithms to try first, with data-specific reasoning:
 
-**🤖 Supervised Learning (Classification & Regression)**
+** Supervised Learning (Classification & Regression)**
 - **Supervised algorithms** — Linear/Logistic Regression, Random Forest, Gradient Boosting (XGBoost), SVM, KNN, Neural Networks, Naive Bayes
-- **Rating system** — ⭐ (1–5 stars) based on your data characteristics
+- **Rating system** — ***** (1–5 stars) based on your data characteristics
 - **Reasoning** — ✓ Why it fits + ✗ When to avoid + ⚠ Before fitting warnings
-- **Class imbalance detection** — ⚠️ Alerts if target variable is imbalanced with actionable solutions (SMOTE, stratified split, class weights)
+- **Class imbalance detection** — Alerts if target variable is imbalanced with actionable solutions (SMOTE, stratified split, class weights)
 
-**📊 Unsupervised Learning (Clustering & Dimensionality Reduction)**
+** Unsupervised Learning (Clustering & Dimensionality Reduction)**
 - **Clustering** — K-Means, DBSCAN, Hierarchical Clustering with data-specific ratings
 - **Reduction** — PCA, t-SNE/UMAP with dimensionality guidance
 - **Anomaly Detection** — Isolation Forest for outlier scoring
 
-**🔧 Multicollinearity Guidance**
+** Multicollinearity Guidance**
 - Detects high correlations (|r| > 0.85) and explains the problem
 - Provides three solutions: (1) Drop correlated features, (2) Use PCA, (3) Use Ridge/Lasso
 
-**📋 Data Preprocessing Pipeline**
+** Data Preprocessing Pipeline**
 - Step-by-step instructions tailored to your dataset
 - Code snippets for imputation, encoding, scaling, and handling outliers
 - Handles special cases: high missingness, skewness, outliers, multicollinearity
@@ -581,7 +581,7 @@ NowEDA/
 - [ ] Additional PII patterns (phone, SSN, credit card)
 - [ ] Streaming / chunked ingestion for large files
 - [ ] PyPI publish
-- [ ] Web dashboard UI
+- [ ] Web dashboard UI (we don't need this so lets not include it)
 - [ ] Feature interaction detection
 - [ ] Correlation explanation for numeric features
 
