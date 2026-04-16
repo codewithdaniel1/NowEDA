@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NowEDA Report</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --text: #e2e8f0;
+    --muted: #8892b0;
+    --accent: #7c6af7;
+    --green: #4ade80;
+    --yellow: #facc15;
+    --red: #f87171;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+  .header { margin-bottom: 36px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+  .header h1 { font-size: 28px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+  .header .meta { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .scores-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 36px; }
+  .score-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center; }
+  .score-card .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .score-card .value { font-size: 40px; font-weight: 800; line-height: 1; }
+  .score-card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+  .section h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .insight-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .insight-item { background: var(--surface2); border-left: 3px solid var(--accent); border-radius: 4px; padding: 10px 14px; font-size: 13px; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .tag-id { background: #312e81; color: #a5b4fc; }
+  .tag-cat { background: #164e63; color: #67e8f9; }
+  .tag-num { background: #14532d; color: #86efac; }
+  .tag-text { background: #44403c; color: #d6d3d1; }
+  .tag-dt { background: #4a1d96; color: #c4b5fd; }
+  .tag-unk { background: #2d2d2d; color: #9ca3af; }
+  .pct-bar { background: var(--surface2); border-radius: 4px; height: 6px; width: 100px; display: inline-block; vertical-align: middle; margin-left: 8px; }
+  .pct-fill { height: 100%; border-radius: 4px; }
+  .empty { color: var(--muted); font-style: italic; font-size: 13px; }
+  .footer { text-align: center; color: var(--muted); font-size: 11px; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>NowEDA Report</h1>
+    <div class="meta">Generated: 2026-04-16 12:16:38</div>
+  </div>
+
+  <div class="scores-grid">
+    <div class="score-card">
+      <div class="label">Data Quality</div>
+      <div class="value" style="color:var(--green)">96</div>
+      <div class="sub">out of 100</div>
+    </div>
+    <div class="score-card">
+      <div class="label">Risk Level</div>
+      <div class="value" style="color:var(--green)">0</div>
+      <div class="sub">higher = more risk</div>
+    </div>
+    <div class="score-card">
+      <div class="label">Model Readiness</div>
+      <div class="value" style="color:var(--green)">79</div>
+      <div class="sub">out of 100</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Insights</h2>
+    <ul class='insight-list'><li class="insight-item">Likely identifier column(s) detected: id, name, tags, knownFor, attribution. Consider excluding from modelling.</li><li class="insight-item">Column(s) with low cardinality (likely categorical): originPrecision, scope.</li><li class="insight-item">Minor missing values in: 'lat', 'lng'.</li><li class="insight-item">Column 'lat' has 6 outlier(s) (IQR method). Review before modelling.</li><li class="insight-item">Column 'firstSeen' has 3 outlier(s) (IQR method). Review before modelling.</li><li class="insight-item">Data quality score is excellent (&gt;=90). Dataset looks clean.</li><li class="insight-item">No risk signals detected.</li></ul>
+  </div>
+
+  <div class="section">
+  <h2>Column Schema</h2>
+  <table>
+    <thead><tr><th>Column</th><th>Dtype</th><th>Role</th><th>Unique Values</th><th>Uniqueness</th></tr></thead>
+    <tbody><tr><td>id</td><td>object</td><td><span class="tag tag-id">ID</span></td><td>81</td><td>100.00%</td></tr><tr><td>name</td><td>object</td><td><span class="tag tag-id">ID</span></td><td>81</td><td>100.00%</td></tr><tr><td>type</td><td>object</td><td><span class="tag tag-text">Text</span></td><td>12</td><td>14.81%</td></tr><tr><td>typeLabel</td><td>object</td><td><span class="tag tag-text">Text</span></td><td>12</td><td>14.81%</td></tr><tr><td>country</td><td>object</td><td><span class="tag tag-text">Text</span></td><td>17</td><td>20.99%</td></tr><tr><td>city</td><td>object</td><td><span class="tag tag-text">Text</span></td><td>34</td><td>41.98%</td></tr><tr><td>lat</td><td>float64</td><td><span class="tag tag-num">Numeric</span></td><td>33</td><td>40.74%</td></tr><tr><td>lng</td><td>float64</td><td><span class="tag tag-num">Numeric</span></td><td>33</td><td>40.74%</td></tr><tr><td>originPrecision</td><td>object</td><td><span class="tag tag-cat">Categorical</span></td><td>3</td><td>3.70%</td></tr><tr><td>firstSeen</td><td>int64</td><td><span class="tag tag-num">Numeric</span></td><td>26</td><td>32.10%</td></tr><tr><td>scope</td><td>object</td><td><span class="tag tag-cat">Categorical</span></td><td>3</td><td>3.70%</td></tr><tr><td>tags</td><td>object</td><td><span class="tag tag-id">ID</span></td><td>80</td><td>98.77%</td></tr><tr><td>knownFor</td><td>object</td><td><span class="tag tag-id">ID</span></td><td>81</td><td>100.00%</td></tr><tr><td>attribution</td><td>object</td><td><span class="tag tag-id">ID</span></td><td>81</td><td>100.00%</td></tr><tr><td>sourceLabel</td><td>object</td><td><span class="tag tag-text">Text</span></td><td>56</td><td>69.14%</td></tr></tbody>
+  </table>
+</div>
+  <div class="section">
+  <h2>Missing Values</h2>
+  <table>
+    <thead><tr><th>Column</th><th>Missing %</th></tr></thead>
+    <tbody><tr><td>lat</td><td>3.7% <span class="pct-bar"><span class="pct-fill" style="width:3%;background:#facc15"></span></span></td></tr><tr><td>lng</td><td>3.7% <span class="pct-bar"><span class="pct-fill" style="width:3%;background:#facc15"></span></span></td></tr><tr><td>id</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr><tr><td>name</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr><tr><td>type</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr><tr><td>typeLabel</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr><tr><td>country</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr><tr><td>city</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr><tr><td>originPrecision</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr><tr><td>firstSeen</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr><tr><td>scope</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr><tr><td>tags</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr><tr><td>knownFor</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr><tr><td>attribution</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr><tr><td>sourceLabel</td><td>0.0% <span class="pct-bar"><span class="pct-fill" style="width:0%;background:#4ade80"></span></span></td></tr></tbody>
+  </table>
+</div>
+  <div class="section">
+  <h2>Duplicates &amp; Constants</h2>
+  <table>
+    <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>Duplicate rows</td><td>0 (0.0%)</td></tr>
+      <tr><td>Constant columns</td><td>None</td></tr>
+    </tbody>
+  </table>
+</div>
+  <div class="section">
+  <h2>Outliers (IQR Method)</h2>
+  <table>
+    <thead><tr><th>Column</th><th>Outlier Count</th></tr></thead>
+    <tbody><tr><td>lat</td><td>6</td></tr><tr><td>firstSeen</td><td>3</td></tr></tbody>
+  </table>
+</div>
+  
+  
+
+  <div class="footer">
+    Built with <strong>NowEDA</strong> — Automated EDA Framework
+  </div>
+
+</div>
+</body>
+</html>

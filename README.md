@@ -6,6 +6,12 @@ NowEDA is a lightweight, modular Python framework that turns any dataset into in
 
 ---
 
+## TODO: 
+1) import noweda as eda
+2) for noweda cli noweda insights we need to add rows and columns and more insights
+think of describe in pandas but with a lot more insights. and also include dtypes. 
+3) i want number #2 to be a a method/function of NowEDA call 'statsall' -- it will include what we talked about (describe in pandas but with a lot more insights, include dtypes, include noweda.score, noweda.insights, noweda.summary, noweda.report)
+
 ## Features
 
 | Feature | Description |
