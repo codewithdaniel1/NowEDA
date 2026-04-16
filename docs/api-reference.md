@@ -4,10 +4,12 @@ Complete reference for all public functions and classes in NowEDA.
 
 ---
 
-## `noweda.read()`
+## `eda.read()` / `noweda.read()`
 
 ```python
-noweda.read(file_path, **kwargs) → pandas.DataFrame
+import noweda as eda
+
+eda.read(file_path, **kwargs) → pandas.DataFrame
 ```
 
 Load any supported file into a pandas DataFrame.
@@ -29,19 +31,19 @@ Load any supported file into a pandas DataFrame.
 **Examples:**
 
 ```python
-df = noweda.read("data.csv")
-df = noweda.read("data.xlsx", sheet_name="Q1")
-df = noweda.read("data.csv", nrows=500, encoding="latin-1")
+df = eda.read("data.csv")
+df = eda.read("data.xlsx", sheet_name="Q1")
+df = eda.read("data.csv", nrows=500, encoding="latin-1")
 ```
 
 ---
 
 ## `NowEDAAccessor`
 
-Registered as `df.noweda` on every `pandas.DataFrame` after `import noweda`.
+Registered as `df.noweda` on every `pandas.DataFrame` after `import noweda as eda`.
 
 ```python
-import noweda
+import noweda as eda
 import pandas as pd
 
 df = pd.DataFrame({"x": [1, 2, 3]})
@@ -118,6 +120,47 @@ Returns the complete report:
     "insights": List,   # same as insights()
 }
 ```
+
+---
+
+### `df.noweda.statsall()`
+
+```python
+df.noweda.statsall() → None
+```
+
+Prints a rich, fully-formatted analysis report to the terminal or notebook. Combines everything in one call:
+
+- **Scores** — data_quality, model_readiness, risk (colour-coded)
+- **Column overview** — dtype, inferred role, unique count, missing count per column
+- **Numeric statistics** — count, mean, std, min, 25%, median, 75%, max, skewness (highlighted when |skew| > 1)
+- **Categorical statistics** — count, unique values, top value, top frequency
+- **Insights** — full human-readable list
+- **Plugin summary** — raw output from outliers, duplicates, PII, encoding plugins
+
+Returns `None`; output is printed directly (suitable for notebooks and terminals).
+
+---
+
+### `df.noweda.vizall()`
+
+```python
+df.noweda.vizall() → None
+```
+
+Auto-renders the best visualizations for your dataset based on column types:
+
+| Chart | Condition |
+|---|---|
+| Histogram + KDE overlay | Every numeric column |
+| Bar chart (top 15) | Every categorical column with ≤ 30 unique values |
+| Correlation heatmap | When ≥ 2 numeric columns exist |
+| Missing value bar chart | When any column has missing values |
+| Time-series line plot | When datetime + numeric columns both exist |
+
+Requires `matplotlib` (`pip install matplotlib`). KDE overlay additionally requires `scipy`.
+
+Returns `None`; charts are rendered inline (Jupyter) or displayed in a window (terminal).
 
 ---
 

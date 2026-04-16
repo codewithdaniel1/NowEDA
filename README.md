@@ -6,19 +6,54 @@ NowEDA is a lightweight, modular Python framework that turns any dataset into in
 
 ---
 
-## TODO: 
-1) import noweda as eda lets put this in all documentations and also in examples, and also in the playground file. 
-2) for noweda cli noweda insights we need to add rows and columns and more insights
-think of describe in pandas but with a lot more insights. and also include dtypes. 
-3) i want number #2 to be a a method/function of NowEDA call 'noweda.statsall' -- it will include what we talked about (describe in pandas but with a lot more insights, include dtypes, include noweda.score, noweda.insights, noweda.summary, noweda.report)
-4) automatically add the best data vizualization according to the data that is presented with just 'noweda.vizall'
+## ML-Ready EDA — One Call Does It All
+
+NowEDA now does **everything** an ML engineer needs before modeling:
+
+### `df.noweda.statsall()` — Complete Statistical Report + Algorithm Recommendations
+Prints a rich, colour-coded report with:
+
+**Data Profile:**
+- **Scores** — data quality, risk, model readiness
+- **Column analysis** — dtypes, roles, diversity metrics
+- **Numeric stats** — mean, std, quartiles, skewness
+- **Categorical stats** — cardinality, diversity, frequency distribution
+- **Insights** — human-readable findings
+
+**Preprocessing Guidance:**
+- ⚠️ **Multicollinearity detection** (VIF > 5) with actionable recommendations
+- 🔧 **Scaling recommendations** (StandardScaler, MinMaxScaler)
+- 📊 **Transformation suggestions** (log, sqrt for skewed data)
+- 🚨 **Cardinality warnings** (high-cardinality categoricals)
+- 🏷️ **Rare category detection** (<1% frequency)
+- ❌ **Missing data strategy** (impute vs drop)
+
+**🤖 ML Algorithm Recommendations:**
+- **Supervised Learning** — Recommends (Linear Regression, Random Forest, XGBoost, SVM, KNN, Neural Networks, Naive Bayes) with:
+  - ⭐ Star ratings based on data fit
+  - ✓ Why each algorithm suits your data
+  - ✗ When to avoid it and why
+- **Unsupervised Learning** — Recommends (K-Means, DBSCAN, Hierarchical Clustering, PCA/t-SNE/UMAP) with reasoning
+- **Data Preprocessing Pipeline** — Step-by-step instructions
+
+### `df.noweda.vizall()` — Advanced ML Visualizations
+Auto-renders 7+ types of charts:
+- Histograms + KDE for numeric columns
+- Bar charts with % labels for categoricals
+- **Box plots** — numeric distributions by categorical (spot relationships)
+- **Feature variance ranking** — importance at a glance
+- **Pair plots** — top correlated features with regression lines
+- **Categorical heatmap** — association strength (Cramér's V)
+- Correlation heatmap, missing value bars, time-series
 
 ## Features
 
 | Feature | Description |
 |---|---|
-| Universal ingestion | CSV, Excel, JSON, XML, HTML |
+| Universal ingestion | CSV, Excel, JSON, XML, HTML — 28 formats |
 | Native pandas accessor | `df.noweda.*` — feels like pandas |
+| **ML Preprocessing Guide** | Multicollinearity (VIF), scaling recommendations, transformations, cardinality warnings |
+| **Advanced Visualizations** | Box plots, pair plots, feature variance ranking, categorical heatmaps |
 | Plugin architecture | Every analysis is a swappable plugin |
 | Schema inference | Auto-detects IDs, categoricals, datetimes, text |
 | Data quality scoring | 0–100 quality + model-readiness score |
@@ -27,6 +62,7 @@ think of describe in pandas but with a lot more insights. and also include dtype
 | Encoding detection | Base64 and obfuscation signals |
 | Outlier detection | IQR-based, per numeric column |
 | Duplicate detection | Exact row duplicates + constant columns |
+| Categorical diversity | Entropy-based balance metric per column |
 | Actionable insights | Human-readable text, not just numbers |
 | HTML report | Dark-themed, stakeholder-ready export |
 | CLI | One-liner from the terminal |
@@ -47,29 +83,36 @@ pip install -e .
 ## Quick Start
 
 ```python
-import noweda
+import noweda as eda
 
-df = noweda.read("data.csv")
+df = eda.read("data.csv")
 
 # Still a regular pandas DataFrame — nothing changes
 print(df.head())
 print(df.describe())
 
 # NowEDA layer
-print(df.noweda.insights())   # human-readable insight list
-print(df.noweda.score())      # quality, risk, model_readiness
-print(df.noweda.summary())    # raw plugin results
-report = df.noweda.report()   # full structured dict
+print(df.eda.insights())   # human-readable insight list
+print(df.eda.score())      # quality, risk, model_readiness
+print(df.eda.summary())    # raw plugin results
+report = df.eda.report()   # full structured dict
+
+# Power methods
+df.eda.statsall()          # full rich report: dtypes + stats + scores + insights
+df.eda.vizall()            # auto-render best charts for every column
+df.eda.mlall()             # ML algorithm recommendations + preprocessing pipeline
 ```
 
 ### All supported formats
 
 ```python
-df = noweda.read("data.csv")
-df = noweda.read("data.xlsx", sheet_name="Sheet1")
-df = noweda.read("data.json")
-df = noweda.read("data.xml")
-df = noweda.read("data.html")
+import noweda as eda
+
+df = eda.read("data.csv")
+df = eda.read("data.xlsx", sheet_name="Sheet1")
+df = eda.read("data.json")
+df = eda.read("data.xml")
+df = eda.read("data.html")
 ```
 
 Any `**kwargs` are forwarded to the underlying pandas reader.
@@ -109,6 +152,7 @@ noweda data.csv --html report.html --json report.json
 Every analysis step is an independent plugin. You can swap, extend, or disable plugins.
 
 ```python
+import noweda as eda
 from noweda.core.engine import AutoEDAEngine
 from noweda.plugins.missing import MissingDataPlugin
 from noweda.plugins.pii import PIIDetectorPlugin
@@ -134,6 +178,7 @@ report = engine.run_df(df)
 ### Writing a custom plugin
 
 ```python
+import noweda as eda
 from noweda.plugins.base import BasePlugin
 
 class MyPlugin(BasePlugin):

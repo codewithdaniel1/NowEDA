@@ -13,9 +13,9 @@ Your team needs to share a customer transaction export with an external analytic
 ## Step 1 — Scan the file
 
 ```python
-import noweda
+import noweda as eda
 
-df = noweda.read("customer_export.csv")
+df = eda.read("customer_export.csv")
 scores = df.noweda.score()
 
 print(f"Risk score: {scores['risk']}")
@@ -172,7 +172,7 @@ generate_html_report(safe_report, "audit_clean.html")
 ```python
 def pii_gate(file_path, max_risk=0):
     """Raise an error if the file contains any PII or risk signals."""
-    df = noweda.read(file_path)
+    df = eda.read(file_path)
     scores = df.noweda.score()
 
     if scores["risk"] > max_risk:

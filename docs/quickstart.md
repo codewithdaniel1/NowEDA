@@ -14,22 +14,22 @@ pip install noweda
 
 ## Step 2 — Load your data
 
-`noweda.read()` replaces every `pd.read_*` call. The file format is detected automatically from the extension.
+`eda.read()` replaces every `pd.read_*` call. The file format is detected automatically from the extension.
 
 ```python
-import noweda
+import noweda as eda
 
-df = noweda.read("data.csv")
-df = noweda.read("data.xlsx")
-df = noweda.read("data.json")
-df = noweda.read("data.parquet")  # requires: pip install "noweda[parquet]"
+df = eda.read("data.csv")
+df = eda.read("data.xlsx")
+df = eda.read("data.json")
+df = eda.read("data.parquet")  # requires: pip install "noweda[parquet]"
 ```
 
 `**kwargs` are forwarded directly to the underlying pandas reader:
 
 ```python
-df = noweda.read("data.xlsx", sheet_name="Sales Q1")
-df = noweda.read("data.csv", nrows=1000, encoding="latin-1")
+df = eda.read("data.xlsx", sheet_name="Sales Q1")
+df = eda.read("data.csv", nrows=1000, encoding="latin-1")
 ```
 
 The returned object is a **standard pandas DataFrame** — every pandas method still works:

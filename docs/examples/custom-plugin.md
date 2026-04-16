@@ -75,7 +75,7 @@ print(result)
 ## Step 3 — Add it to NowEDA's engine
 
 ```python
-import noweda
+import noweda as eda
 from noweda.core.engine import AutoEDAEngine
 from noweda.plugins import default_plugins
 from my_plugins.phone import PhoneNumberPlugin
@@ -84,7 +84,7 @@ from my_plugins.phone import PhoneNumberPlugin
 plugins = default_plugins() + [PhoneNumberPlugin()]
 engine = AutoEDAEngine(plugins)
 
-df = noweda.read("contacts.csv")
+df = eda.read("contacts.csv")
 report = engine.run_df(df)
 
 print(report["results"]["phone"])
@@ -162,7 +162,7 @@ class SecureEngine(AutoEDAEngine):
 plugins = default_plugins() + [PhoneNumberPlugin()]
 engine = SecureEngine(plugins)
 
-df = noweda.read("contacts.csv")
+df = eda.read("contacts.csv")
 report = engine.run_df(df)
 
 for insight in report["insights"]:
@@ -193,6 +193,6 @@ import pandas as pd
 pd.api.extensions.register_dataframe_accessor("noweda")(SecureAccessor)
 
 # Now df.noweda.* uses your custom engine
-df = noweda.read("contacts.csv")
+df = eda.read("contacts.csv")
 df.noweda.insights()   # includes phone number insights
 ```

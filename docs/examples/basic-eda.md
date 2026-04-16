@@ -11,7 +11,7 @@ pip install noweda
 ```
 
 ```python
-import noweda
+import noweda as eda
 ```
 
 ---
@@ -19,7 +19,7 @@ import noweda
 ## Step 1 — Load the data
 
 ```python
-df = noweda.read("employees.csv")
+df = eda.read("employees.csv")
 print(df.shape)    # (25, 10)
 print(df.dtypes)
 ```

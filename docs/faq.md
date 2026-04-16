@@ -10,12 +10,12 @@ No. NowEDA only reads your DataFrame. Plugins never mutate the input. The access
 
 ---
 
-**Q: Does NowEDA work with DataFrames I didn't load with `noweda.read()`?**
+**Q: Does NowEDA work with DataFrames I didn't load with `eda.read()`?** (e.g., `pd.read_sql`, `pd.read_csv`)
 
-Yes. As long as `import noweda` has been executed, `df.noweda.*` is available on any pandas DataFrame, regardless of how it was created.
+Yes. As long as `import noweda as eda` has been executed, `df.noweda.*` is available on any pandas DataFrame, regardless of how it was created.
 
 ```python
-import noweda
+import noweda as eda
 import pandas as pd
 
 df = pd.read_sql("SELECT * FROM orders", conn)
@@ -27,7 +27,7 @@ df.noweda.insights()   # works
 **Q: How do I use NowEDA with a DataFrame from a database?**
 
 ```python
-import noweda
+import noweda as eda
 import pandas as pd
 import sqlite3
 
@@ -40,10 +40,10 @@ df.noweda.score()
 
 **Q: Why is `df.noweda` not available?**
 
-You need to `import noweda` in the same Python session. The import is what registers the accessor. If you just did `from noweda.plugins.pii import PIIDetectorPlugin` without importing the top-level package, the accessor won't be registered.
+You need to `import noweda as eda` in the same Python session. The import is what registers the accessor. If you just did `from noweda.plugins.pii import PIIDetectorPlugin` without importing the top-level package, the accessor won't be registered.
 
 ```python
-import noweda   # this line is required
+import noweda as eda   # this line is required
 ```
 
 ---
@@ -77,7 +77,7 @@ The accessor caches results after the first call. To re-run analysis on modified
 **Q: My file has a `.txt` extension but it's tab-separated. How do I load it?**
 
 ```python
-df = noweda.read("data.txt", sep="\t")
+df = eda.read("data.txt", sep="\t")
 ```
 
 `.txt` is treated as CSV by default. Pass `sep=` to override.
@@ -87,7 +87,7 @@ df = noweda.read("data.txt", sep="\t")
 **Q: I have a multi-sheet Excel file. How do I load a specific sheet?**
 
 ```python
-df = noweda.read("report.xlsx", sheet_name="Q3 Sales")
+df = eda.read("report.xlsx", sheet_name="Q3 Sales")
 ```
 
 All `**kwargs` are passed to `pd.read_excel()`.
@@ -96,12 +96,12 @@ All `**kwargs` are passed to `pd.read_excel()`.
 
 **Q: Can NowEDA read files from a URL?**
 
-Not directly — `noweda.read()` requires a local file path. Download first:
+Not directly — `eda.read()` / `noweda.read()` requires a local file path. Download first:
 
 ```python
 import urllib.request
 urllib.request.urlretrieve("https://example.com/data.csv", "data.csv")
-df = noweda.read("data.csv")
+df = eda.read("data.csv")
 ```
 
 ---

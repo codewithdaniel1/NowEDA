@@ -164,7 +164,7 @@ def patched_defaults():
 _plugins.default_plugins = patched_defaults
 
 # Now df.noweda.* uses your extended plugin list
-df = noweda.read("data.csv")
+df = eda.read("data.csv")
 print(df.noweda.summary()["negatives"])
 ```
 

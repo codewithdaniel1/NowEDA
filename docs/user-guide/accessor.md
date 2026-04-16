@@ -6,17 +6,17 @@ The `df.noweda` accessor is a [pandas extension accessor](https://pandas.pydata.
 
 ## How It Works
 
-When you `import noweda`, the accessor is registered globally on the `pandas.DataFrame` class. This means it's available on **any** DataFrame — not just ones loaded with `noweda.read()`.
+When you `import noweda as eda`, the accessor is registered globally on the `pandas.DataFrame` class. This means it's available on **any** DataFrame — not just ones loaded with `eda.read()`.
 
 ```python
-import noweda
+import noweda as eda
 import pandas as pd
 
 # Works on DataFrames from any source
 df = pd.read_csv("data.csv")     # regular pandas load
 df.noweda.insights()              # NowEDA is available
 
-df2 = noweda.read("data.xlsx")   # NowEDA load
+df2 = eda.read("data.xlsx")      # NowEDA load
 df2.noweda.insights()             # also works
 ```
 
@@ -27,7 +27,7 @@ df2.noweda.insights()             # also works
 NowEDA does **not** run analysis when you load data. Analysis is deferred until you first call a `df.noweda.*` method. The result is then **cached** on the accessor instance, so subsequent calls are instant.
 
 ```python
-df = noweda.read("data.csv")      # no analysis runs here
+df = eda.read("data.csv")         # no analysis runs here
 
 df.noweda.score()                  # analysis runs here (first call)
 df.noweda.insights()               # instant — uses the cache
@@ -192,6 +192,52 @@ Use `report()` when passing data to the HTML generator, serializing to JSON, or 
 
 ---
 
+### `df.noweda.statsall()`
+
+Prints a rich, colour-coded full-analysis report to the terminal or Jupyter notebook. Combines everything in one call — no assembly required.
+
+```python
+df.noweda.statsall()
+```
+
+Output sections:
+
+| Section | What you see |
+|---|---|
+| **Scores** | data_quality, model_readiness, risk — colour-coded green/yellow/red |
+| **Column overview** | dtype, inferred role, unique count, missing count |
+| **Numeric stats** | count, mean, std, min, 25%, median, 75%, max, skewness |
+| **Categorical stats** | count, unique values, top value, top frequency |
+| **Insights** | full human-readable bullet list |
+| **Plugin summary** | raw results from outliers, duplicates, PII, encoding |
+
+---
+
+### `df.noweda.vizall()`
+
+Auto-renders the best visualizations for your dataset without any configuration.
+
+```python
+df.noweda.vizall()
+```
+
+| Chart produced | Trigger |
+|---|---|
+| Histogram + KDE overlay (grid) | Every numeric column |
+| Bar chart top-15 values (grid) | Every categorical column with ≤ 30 unique values |
+| Correlation heatmap | When ≥ 2 numeric columns exist |
+| Missing value bar chart | When any column has missing values |
+| Time-series line plot | When datetime + numeric columns both exist |
+
+Requires `matplotlib`. KDE overlay additionally uses `scipy` if installed.
+
+```python
+# Works in Jupyter notebooks (inline) or terminal (opens window)
+df.noweda.vizall()
+```
+
+---
+
 ## Accessing Individual Plugin Results
 
 You can drill into any plugin's output directly via `summary()`:
@@ -227,7 +273,7 @@ for col1 in corr:
 The accessor works on any DataFrame. Just make sure noweda is imported so the accessor gets registered:
 
 ```python
-import noweda          # registers df.noweda on all DataFrames
+import noweda as eda   # registers df.noweda on all DataFrames
 import pandas as pd
 
 df = pd.read_sql("SELECT * FROM transactions", conn)

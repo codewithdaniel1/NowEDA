@@ -10,7 +10,7 @@ NowEDA ships with a command-line tool installed as `noweda`. After `pip install 
 noweda <file>
 ```
 
-Reads the file, runs all plugins, and prints insights and scores to the terminal.
+Reads the file, runs all plugins, and prints a rich report to the terminal — including row/column counts, dtypes, descriptive statistics, and actionable insights.
 
 ---
 
@@ -32,24 +32,56 @@ Options:
 
 ## Examples
 
-### Print insights to terminal
+### Print full report to terminal
 
 ```bash
 noweda data.csv
 ```
 
 ```
-=== NOWEDA INSIGHTS ===
-- Likely identifier column(s) detected: id. Consider excluding from modelling.
-- Datetime column(s) detected: join_date. Temporal features may be valuable.
-- Column 'encoded_field' is 72% missing — consider dropping it.
-- Column 'email' has high missing rate (32%) — imputation recommended.
-- PII detected in column 'email': 17 email address(es) found. Mask before sharing.
-- Data quality score is acceptable (77). Minor issues present.
-- Moderate risk level (25). Review PII and encoded columns before sharing.
+========================================================================
+  NowEDA · data.csv
+========================================================================
+  Rows    : 25
+  Columns : 10
 
-=== SCORES ===
-{'data_quality': 77, 'risk': 25, 'model_readiness': 53}
+Scores
+------------------------------------------------------------
+  Data Quality    : 77 / 100
+  Model Readiness : 53 / 100
+  Risk            : 25  (0 = no risk)
+
+Columns
+------------------------------------------------------------
+  Column          Dtype          Role                    Unique  Missing
+  --------------- -------------- ----------------------  ------  -------
+  id              int64          id_candidate                25        0
+  name            object         text                        24        1
+  email           object         text                        17        8
+  age             int64          numeric                     15        0
+  salary          float64        numeric                     23        2
+  department      object         categorical                  4        0
+  join_date       object         datetime                    24        2
+  score           float64        numeric                     22        3
+  flag            int64          categorical_numeric          2        0
+  encoded_field   object         text                         7       18
+
+Numeric Statistics
+------------------------------------------------------------
+  Column     Count         Mean          Std        Min        25%        50%        75%        Max     Skew
+  ---------- --------  ------------ ------------  ---------- ---------- ---------- ---------- ----------  --------
+  age           25         32.6          9.5          21         25         31         40         55     0.52
+  salary        23       62500        18300        30000      49000      60000      72000     110000     0.89
+  ...
+
+Insights
+------------------------------------------------------------
+  • Likely identifier column(s) detected: id. Consider excluding from modelling.
+  • Column 'encoded_field' is 72% missing — consider dropping it.
+  • PII detected in column 'email': 17 email address(es) found. Mask before sharing.
+  • Data quality score is acceptable (77). Minor issues present.
+  • Moderate risk level (25). Review PII and encoded columns before sharing.
+========================================================================
 ```
 
 ---

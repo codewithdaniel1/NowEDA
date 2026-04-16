@@ -1,15 +1,15 @@
 # Reading Data
 
-`noweda.read()` is your single entry point for loading any tabular dataset. It auto-detects the file format from the extension, routes to the correct pandas reader, and returns a standard DataFrame with the `df.noweda` accessor ready to use.
+`eda.read()` is your single entry point for loading any tabular dataset. It auto-detects the file format from the extension, routes to the correct pandas reader, and returns a standard DataFrame with the `df.noweda` accessor ready to use.
 
 ---
 
 ## Basic Usage
 
 ```python
-import noweda
+import noweda as eda
 
-df = noweda.read("path/to/file.csv")
+df = eda.read("path/to/file.csv")
 ```
 
 All `**kwargs` are forwarded directly to the underlying pandas reader, so every option you know from `pd.read_csv`, `pd.read_excel`, etc. works exactly the same way.
@@ -24,15 +24,15 @@ All `**kwargs` are forwarded directly to the underlying pandas reader, so every 
 
     ```python
     # Basic
-    df = noweda.read("data.csv")
+    df = eda.read("data.csv")
 
     # With options
-    df = noweda.read("data.csv", sep=",", encoding="utf-8", nrows=1000)
-    df = noweda.read("data.csv", skiprows=2, header=0)
-    df = noweda.read("data.csv", usecols=["id", "name", "amount"])
-    df = noweda.read("data.csv", dtype={"id": str, "amount": float})
-    df = noweda.read("data.csv", parse_dates=["created_at"])
-    df = noweda.read("data.csv", na_values=["N/A", "NULL", "-"])
+    df = eda.read("data.csv", sep=",", encoding="utf-8", nrows=1000)
+    df = eda.read("data.csv", skiprows=2, header=0)
+    df = eda.read("data.csv", usecols=["id", "name", "amount"])
+    df = eda.read("data.csv", dtype={"id": str, "amount": float})
+    df = eda.read("data.csv", parse_dates=["created_at"])
+    df = eda.read("data.csv", na_values=["N/A", "NULL", "-"])
     ```
 
     File extensions recognized: `.csv`, `.CSV` (case-insensitive)
@@ -41,12 +41,12 @@ All `**kwargs` are forwarded directly to the underlying pandas reader, so every 
 
     ```python
     # Auto-detected as tab-separated
-    df = noweda.read("data.tsv")
-    df = noweda.read("data.tab")
+    df = eda.read("data.tsv")
+    df = eda.read("data.tab")
 
     # Override separator for non-standard delimiters
-    df = noweda.read("data.csv", sep="|")    # pipe-delimited
-    df = noweda.read("data.csv", sep=";")    # semicolon-delimited
+    df = eda.read("data.csv", sep="|")    # pipe-delimited
+    df = eda.read("data.csv", sep=";")    # semicolon-delimited
     ```
 
     File extensions recognized: `.tsv`, `.tab`
@@ -55,8 +55,8 @@ All `**kwargs` are forwarded directly to the underlying pandas reader, so every 
 
     ```python
     # Treated as CSV by default; pass sep= for other delimiters
-    df = noweda.read("data.txt")
-    df = noweda.read("data.txt", sep="\t")
+    df = eda.read("data.txt")
+    df = eda.read("data.txt", sep="\t")
     ```
 
 ---
@@ -67,18 +67,18 @@ All `**kwargs` are forwarded directly to the underlying pandas reader, so every 
 
     ```python
     # Basic — reads the first sheet
-    df = noweda.read("data.xlsx")
+    df = eda.read("data.xlsx")
 
     # Specific sheet
-    df = noweda.read("data.xlsx", sheet_name="Sales Q1")
-    df = noweda.read("data.xlsx", sheet_name=0)   # by index
+    df = eda.read("data.xlsx", sheet_name="Sales Q1")
+    df = eda.read("data.xlsx", sheet_name=0)   # by index
 
     # Skip header rows
-    df = noweda.read("data.xlsx", skiprows=3, header=0)
+    df = eda.read("data.xlsx", skiprows=3, header=0)
 
     # Select specific columns
-    df = noweda.read("data.xlsx", usecols="A:E")
-    df = noweda.read("data.xlsx", usecols=[0, 1, 4])
+    df = eda.read("data.xlsx", usecols="A:E")
+    df = eda.read("data.xlsx", usecols=[0, 1, 4])
     ```
 
     File extensions recognized: `.xlsx`, `.xlsm`, `.xlsb`
@@ -86,8 +86,8 @@ All `**kwargs` are forwarded directly to the underlying pandas reader, so every 
 === "Legacy Excel (.xls)"
 
     ```python
-    df = noweda.read("data.xls")
-    df = noweda.read("data.xls", sheet_name="Sheet1")
+    df = eda.read("data.xls")
+    df = eda.read("data.xls", sheet_name="Sheet1")
     ```
 
     File extensions recognized: `.xls`
@@ -95,9 +95,9 @@ All `**kwargs` are forwarded directly to the underlying pandas reader, so every 
 === "OpenDocument (.ods)"
 
     ```python
-    df = noweda.read("data.ods")
-    df = noweda.read("data.odf")
-    df = noweda.read("data.odt")
+    df = eda.read("data.ods")
+    df = eda.read("data.odf")
+    df = eda.read("data.odt")
     ```
 
     Requires `odfpy`: `pip install odfpy`
@@ -111,15 +111,15 @@ All `**kwargs` are forwarded directly to the underlying pandas reader, so every 
     ```python
     # Records orient (most common)
     # [{"col1": val1, "col2": val2}, ...]
-    df = noweda.read("data.json")
+    df = eda.read("data.json")
 
     # Other orients
-    df = noweda.read("data.json", orient="columns")
-    df = noweda.read("data.json", orient="index")
-    df = noweda.read("data.json", orient="split")
+    df = eda.read("data.json", orient="columns")
+    df = eda.read("data.json", orient="index")
+    df = eda.read("data.json", orient="split")
 
     # Nested JSON with normalization
-    df = noweda.read("data.json", orient="records")
+    df = eda.read("data.json", orient="records")
     ```
 
 === ".jsonl (JSON Lines)"
@@ -127,7 +127,7 @@ All `**kwargs` are forwarded directly to the underlying pandas reader, so every 
     Each line is one JSON object — common for streaming / log data:
 
     ```python
-    df = noweda.read("events.jsonl", lines=True)
+    df = eda.read("events.jsonl", lines=True)
     ```
 
 ---
@@ -135,13 +135,13 @@ All `**kwargs` are forwarded directly to the underlying pandas reader, so every 
 ### XML
 
 ```python
-df = noweda.read("data.xml")
+df = eda.read("data.xml")
 
 # Specify XPath to the row elements
-df = noweda.read("data.xml", xpath=".//record")
+df = eda.read("data.xml", xpath=".//record")
 
 # Specify namespace
-df = noweda.read("data.xml", namespaces={"ns": "http://example.com/ns"})
+df = eda.read("data.xml", namespaces={"ns": "http://example.com/ns"})
 ```
 
 !!! note
@@ -153,11 +153,11 @@ df = noweda.read("data.xml", namespaces={"ns": "http://example.com/ns"})
 
 ```python
 # Reads the first `<table>` found in the file
-df = noweda.read("data.html")
-df = noweda.read("data.htm")
+df = eda.read("data.html")
+df = eda.read("data.htm")
 
 # Select a specific table by index (0-based)
-df = noweda.read("data.html", match="Revenue")   # match by text
+df = eda.read("data.html", match="Revenue")   # match by text
 ```
 
 !!! tip
@@ -175,13 +175,13 @@ df = noweda.read("data.html", match="Revenue")   # match by text
 === "Parquet"
 
     ```python
-    df = noweda.read("data.parquet")
+    df = eda.read("data.parquet")
 
     # Specific columns (efficient — only reads those columns from disk)
-    df = noweda.read("data.parquet", columns=["id", "amount", "date"])
+    df = eda.read("data.parquet", columns=["id", "amount", "date"])
 
     # Specific row groups
-    df = noweda.read("data.parquet", filters=[("amount", ">", 1000)])
+    df = eda.read("data.parquet", filters=[("amount", ">", 1000)])
     ```
 
     Parquet is the industry standard for large analytical datasets.
@@ -190,8 +190,8 @@ df = noweda.read("data.html", match="Revenue")   # match by text
 === "Feather"
 
     ```python
-    df = noweda.read("data.feather")
-    df = noweda.read("data.feather", columns=["col1", "col2"])
+    df = eda.read("data.feather")
+    df = eda.read("data.feather", columns=["col1", "col2"])
     ```
 
     Feather is optimized for fast read/write within Python/R workflows.
@@ -199,8 +199,8 @@ df = noweda.read("data.html", match="Revenue")   # match by text
 === "ORC"
 
     ```python
-    df = noweda.read("data.orc")
-    df = noweda.read("data.orc", columns=["id", "value"])
+    df = eda.read("data.orc")
+    df = eda.read("data.orc", columns=["id", "value"])
     ```
 
     ORC is common in Hadoop and Spark pipelines.
@@ -215,13 +215,13 @@ df = noweda.read("data.html", match="Revenue")   # match by text
     ```
 
 ```python
-df = noweda.read("data.h5")
-df = noweda.read("data.hdf5")
-df = noweda.read("data.hdf")
+df = eda.read("data.h5")
+df = eda.read("data.hdf5")
+df = eda.read("data.hdf")
 
 # Specify the key (dataset name inside the HDF5 file)
-df = noweda.read("data.h5", key="/transactions")
-df = noweda.read("data.h5", key="df")
+df = eda.read("data.h5", key="/transactions")
+df = eda.read("data.h5", key="df")
 ```
 
 HDF5 stores multiple datasets in a single file under named keys. Use `h5py` or `pandas.HDFStore` to inspect what keys a file contains.
@@ -233,10 +233,10 @@ HDF5 stores multiple datasets in a single file under named keys. Use `h5py` or `
 === "Stata (.dta)"
 
     ```python
-    df = noweda.read("data.dta")
+    df = eda.read("data.dta")
 
     # Convert categoricals (Stata uses numeric codes with labels)
-    df = noweda.read("data.dta", convert_categoricals=True)
+    df = eda.read("data.dta", convert_categoricals=True)
     ```
 
     No extra dependencies needed.
@@ -244,11 +244,11 @@ HDF5 stores multiple datasets in a single file under named keys. Use `h5py` or `
 === "SAS (.sas7bdat / .xpt)"
 
     ```python
-    df = noweda.read("data.sas7bdat")
-    df = noweda.read("data.xpt")      # SAS transport format
+    df = eda.read("data.sas7bdat")
+    df = eda.read("data.xpt")      # SAS transport format
 
     # Chunk large SAS files
-    df = noweda.read("data.sas7bdat", chunksize=10000)
+    df = eda.read("data.sas7bdat", chunksize=10000)
     ```
 
     No extra dependencies needed.
@@ -261,11 +261,11 @@ HDF5 stores multiple datasets in a single file under named keys. Use `h5py` or `
         ```
 
     ```python
-    df = noweda.read("data.sav")
-    df = noweda.read("data.zsav")    # compressed SPSS
+    df = eda.read("data.sav")
+    df = eda.read("data.zsav")    # compressed SPSS
 
     # Apply value labels
-    df = noweda.read("data.sav", apply_value_labels=True)
+    df = eda.read("data.sav", apply_value_labels=True)
     ```
 
 ---
@@ -273,8 +273,8 @@ HDF5 stores multiple datasets in a single file under named keys. Use `h5py` or `
 ### Python Pickle
 
 ```python
-df = noweda.read("data.pkl")
-df = noweda.read("data.pickle")
+df = eda.read("data.pkl")
+df = eda.read("data.pickle")
 ```
 
 !!! warning "Security note"
@@ -287,7 +287,7 @@ df = noweda.read("data.pickle")
 ### Unsupported format
 
 ```python
-noweda.read("data.avro")
+eda.read("data.avro")
 # ValueError: Unsupported file extension: '.avro'
 # Supported extensions: .csv, .feather, .h5, .hdf, ...
 ```
@@ -295,14 +295,14 @@ noweda.read("data.avro")
 ### File not found
 
 ```python
-noweda.read("missing.csv")
+eda.read("missing.csv")
 # FileNotFoundError: File not found: missing.csv
 ```
 
 ### Missing optional dependency
 
 ```python
-noweda.read("data.parquet")
+eda.read("data.parquet")
 # ImportError: Reading .parquet files requires 'pyarrow'.
 # Install it with:  pip install noweda[parquet]
 ```

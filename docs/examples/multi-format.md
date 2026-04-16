@@ -7,31 +7,31 @@ NowEDA reads 28 file extensions. This example shows how to load and analyse data
 ## Loading Different Formats
 
 ```python
-import noweda
+import noweda as eda
 
 # Delimited text
-csv_df   = noweda.read("sales.csv")
-tsv_df   = noweda.read("events.tsv")
+csv_df   = eda.read("sales.csv")
+tsv_df   = eda.read("events.tsv")
 
 # Spreadsheets
-xlsx_df  = noweda.read("report.xlsx", sheet_name="Summary")
-ods_df   = noweda.read("budget.ods")
+xlsx_df  = eda.read("report.xlsx", sheet_name="Summary")
+ods_df   = eda.read("budget.ods")
 
 # Structured data
-json_df  = noweda.read("api_response.json")
-xml_df   = noweda.read("records.xml")
-html_df  = noweda.read("web_table.html")
+json_df  = eda.read("api_response.json")
+xml_df   = eda.read("records.xml")
+html_df  = eda.read("web_table.html")
 
 # Big data formats (requires: pip install "noweda[parquet]")
-parquet_df = noweda.read("transactions.parquet")
-feather_df = noweda.read("cache.feather")
+parquet_df = eda.read("transactions.parquet")
+feather_df = eda.read("cache.feather")
 
 # Statistical software
-stata_df  = noweda.read("survey.dta")
-sas_df    = noweda.read("results.sas7bdat")
+stata_df  = eda.read("survey.dta")
+sas_df    = eda.read("results.sas7bdat")
 
 # Python
-pickle_df = noweda.read("model_data.pkl")
+pickle_df = eda.read("model_data.pkl")
 ```
 
 ---
@@ -41,7 +41,7 @@ pickle_df = noweda.read("model_data.pkl")
 ```python
 import os
 import pandas as pd
-import noweda
+import noweda as eda
 
 def scan_directory(folder):
     """Run NowEDA on every supported file in a folder."""
@@ -59,7 +59,7 @@ def scan_directory(folder):
 
         path = os.path.join(folder, fname)
         try:
-            df = noweda.read(path)
+            df = eda.read(path)
             results[fname] = {
                 "rows":         len(df),
                 "columns":      len(df.columns),
@@ -90,10 +90,10 @@ for filename, info in findings.items():
 A common use case: compare a new data export against last month's version.
 
 ```python
-import noweda
+import noweda as eda
 
-old = noweda.read("customers_march.csv")
-new = noweda.read("customers_april.csv")
+old = eda.read("customers_march.csv")
+new = eda.read("customers_april.csv")
 
 old_scores = old.noweda.score()
 new_scores = new.noweda.score()
@@ -119,10 +119,10 @@ Score comparison:
 Load one format, transform, export another:
 
 ```python
-import noweda
+import noweda as eda
 
 # Load Excel, inspect, save as Parquet (much faster for big data)
-df = noweda.read("large_report.xlsx")
+df = eda.read("large_report.xlsx")
 
 print(df.noweda.score())
 
@@ -147,7 +147,7 @@ import pandas as pd
 xl = pd.ExcelFile("workbook.xlsx")
 
 for sheet in xl.sheet_names:
-    df = noweda.read("workbook.xlsx", sheet_name=sheet)
+    df = eda.read("workbook.xlsx", sheet_name=sheet)
     score = df.noweda.score()
     print(f"Sheet '{sheet}': quality={score['data_quality']}, rows={len(df)}")
 ```
@@ -156,7 +156,7 @@ for sheet in xl.sheet_names:
 
 ```python
 # Only load the columns you need — much faster for wide Parquet files
-df = noweda.read("big_data.parquet", columns=["user_id", "amount", "date"])
+df = eda.read("big_data.parquet", columns=["user_id", "amount", "date"])
 df.noweda.score()
 ```
 

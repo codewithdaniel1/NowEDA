@@ -90,8 +90,8 @@ pip install pytest mkdocs mkdocs-material
 ## Verify Installation
 
 ```python
-import noweda
-print(noweda.__version__)   # 0.1.0
+import noweda as eda
+print(eda.__version__)   # 0.1.0
 
 import pandas as pd
 df = pd.DataFrame({"x": [1, 2, 3]})
@@ -105,7 +105,7 @@ print(df.noweda.score())    # {'data_quality': 100, 'risk': 0, 'model_readiness'
 NowEDA gives you a clear, actionable error instead of a confusing traceback:
 
 ```python
-noweda.read("data.parquet")
+eda.read("data.parquet")
 # ImportError: Reading .parquet files requires 'pyarrow'.
 # Install it with:  pip install noweda[parquet]
 ```

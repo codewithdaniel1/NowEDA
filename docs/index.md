@@ -35,10 +35,10 @@ Most EDA tools give you charts and tables. NowEDA gives you **answers**.
 ## Quick Example
 
 ```python
-import noweda
+import noweda as eda
 
-# Works exactly like pandas — just swap pd.read_csv for noweda.read
-df = noweda.read("transactions.csv")
+# Works exactly like pandas — just swap pd.read_csv for eda.read
+df = eda.read("transactions.csv")
 
 # All normal pandas operations still work
 print(df.head())
