@@ -6,13 +6,13 @@ NowEDA is a lightweight, modular Python framework that turns any dataset into in
 
 ---
 
-## Three Powerful Methods — Everything You Need for ML-Ready EDA
+## 5 Powerful Methods — Everything You Need for ML-Ready EDA
 
-NowEDA provides three fully automated methods that do **everything** an ML engineer needs before modeling:
+NowEDA provides 5 powerful methods that do **everything** an ML engineer needs before modeling:
 
 `import noweda as eda`
 
-### 1. `df.eda.statsall()` — Complete Statistical Analysis Report
+### 1. `df.eda.statsall()` — Complete Statistical & ML Analysis Report
 
 Prints a rich, colour-coded report with comprehensive data profiling:
 
@@ -104,12 +104,247 @@ df_v1.eda.compare(df_v2)          # Detect schema changes between versions
 
 ---
 
+## Optional: Quick-Access One-Liner Methods
+
+For quick access to individual analysis tables during interactive exploration. All methods return **pandas DataFrames** for easy inspection and manipulation:
+
+### Data Quality & Scores
+
+#### `df.eda.scores_df()`
+Returns a DataFrame with data quality, model readiness, and risk scores.
+
+| Score | Range | Meaning |
+|---|---|---|
+| `data_quality` | 0–100 | Penalised for missing values, duplicates, constants, outliers |
+| `model_readiness` | 0–100 | Penalised for skew, untyped columns, high missingness |
+| `risk` | 0+ | Added per PII column (+15) and encoded column (+10) |
+
+**Returns:** DataFrame with shape (3, 1), containing scores.
+
+```python
+scores = df.eda.scores_df()
+print(scores)
+#               Value
+# data_quality    87.5
+# model_readiness  82.1
+# risk            15.0
+```
+
+---
+
+#### `df.eda.insights_df(full_line=True)`
+Returns a DataFrame with human-readable insights about data quality, patterns, and issues.
+
+**Parameters:**
+- `full_line` (bool, default=True) — If True, shows complete insight text. If False, truncates at ~50 characters for compact display.
+
+**Returns:** DataFrame with columns: `[Insight]`
+
+```python
+# Full insights (default)
+insights = df.eda.insights_df()
+
+# Compact insights (truncated for brief review)
+insights = df.eda.insights_df(full_line=False)
+```
+
+---
+
+### Schema & Column Information
+
+#### `df.eda.schema_df()`
+Returns a DataFrame with inferred column roles, types, and confidence scores.
+
+**Returns:** DataFrame with columns: `[Column, Role, Type, Confidence]`
+
+```python
+schema = df.eda.schema_df()
+print(schema)
+#      Column       Role      Type  Confidence
+# 0      user_id        id     int64        0.99
+# 1      age      numeric   int64        0.95
+# 2      name         text    object       0.88
+# 3      signup_date  datetime  datetime64   0.98
+```
+
+---
+
+#### `df.eda.stats_df()`
+Returns a DataFrame with descriptive statistics (mean, std, quartiles, skewness, etc.) for numeric columns.
+
+**Returns:** DataFrame with columns: `[Column, Mean, Std, Min, Q1, Median, Q3, Max, Skewness, Kurtosis]`
+
+```python
+stats = df.eda.stats_df()
+```
+
+---
+
+### Missing Data & Duplicates
+
+#### `df.eda.missing_df(format='percentage')`
+Returns a DataFrame with missing data rates per column. Choose between percentages or counts.
+
+**Parameters:**
+- `format` (str, default='percentage') — Display format: `'percentage'` shows missing data as %, `'number'` shows absolute missing counts.
+
+**Returns:** DataFrame with columns: `[Column, Missing_Data]`
+
+```python
+# Default: show missing data as percentage
+missing = df.eda.missing_df()
+print(missing)
+#        Column Missing_Data
+# 0         age          2.5%
+# 1       salary         15.3%
+
+# Alternative: show absolute missing counts
+missing = df.eda.missing_df(format='number')
+print(missing)
+#        Column Missing_Data
+# 0         age            50
+# 1       salary          306
+```
+
+---
+
+#### `df.eda.duplicates_df()`
+Returns a DataFrame summarising duplicate rows and constant columns.
+
+**Returns:** DataFrame with metrics: `[Total Rows, Duplicate Rows, Constant Columns]`
+
+```python
+duplicates = df.eda.duplicates_df()
+print(duplicates)
+#                   Metric  Value
+# 0             Total Rows  2000
+# 1        Duplicate Rows    15
+# 2      Constant Columns     3
+```
+
+---
+
+### Correlations & Outliers
+
+#### `df.eda.correlation_df()`
+Returns the Pearson correlation matrix between all numeric columns.
+
+**Returns:** DataFrame — correlation matrix (symmetric, numeric columns × numeric columns)
+
+```python
+corr = df.eda.correlation_df()
+print(corr)
+#            age    salary    score
+# age       1.00     0.65     0.42
+# salary    0.65     1.00     0.78
+# score     0.42     0.78     1.00
+```
+
+---
+
+#### `df.eda.outliers_df(format='number')`
+Returns outlier counts per numeric column. Choose between absolute counts or percentages.
+
+**Parameters:**
+- `format` (str, default='number') — Display format: `'number'` shows outlier counts, `'percentage'` shows as % of total rows.
+
+**Returns:** DataFrame with columns: `[Column, Outliers]`
+
+```python
+# Default: show outlier counts
+outliers = df.eda.outliers_df()
+print(outliers)
+#      Column  Outliers
+# 0       age         12
+# 1    salary         25
+
+# Alternative: show outliers as percentage
+outliers = df.eda.outliers_df(format='percentage')
+print(outliers)
+#      Column  Outliers
+# 0       age      0.6%
+# 1    salary      1.2%
+```
+
+---
+
+### PII & Encoding Detection
+
+#### `df.eda.pii_df()`
+Returns a DataFrame listing all detected PII (Personally Identifiable Information) fields.
+
+**Returns:** DataFrame with columns: `[Column, PII_Type, Sample]`
+
+```python
+pii = df.eda.pii_df()
+print(pii)
+#        Column PII_Type                Sample
+# 0  customer_email    email  john@example.com
+# 1  user_address    email   sarah@test.org
+```
+
+---
+
+#### `df.eda.encoding_df()`
+Returns a DataFrame listing columns with detected encoding signals (Base64, obfuscation patterns).
+
+**Returns:** DataFrame with columns: `[Column, Encoding_Type, Sample]`
+
+```python
+encoding = df.eda.encoding_df()
+print(encoding)
+#        Column       Encoding_Type               Sample
+# 0  customer_id    base64_signal   aGVsbG8gd29ybGQ=
+# 1  secret_key    obfuscation     xxxxxxxx1234xxxx
+```
+
+---
+
+## Usage Summary
+
+| Method | Returns | Key Parameters |
+|---|---|---|
+| `statsall()` | Prints comprehensive report | — |
+| `mlall()` | Prints ML recommendations | — |
+| `vizall()` | Displays visualizations | — |
+| `profile_column(col)` | Prints single-column analysis | `col` — column name |
+| `compare(other_df)` | Prints schema drift report | `other_df` — comparison dataset |
+| `scores_df()` | DataFrame (3 rows) | — |
+| `insights_df()` | DataFrame | `full_line` (default=True) |
+| `schema_df()` | DataFrame | — |
+| `stats_df()` | DataFrame | — |
+| `missing_df()` | DataFrame | `format` (default='percentage') |
+| `duplicates_df()` | DataFrame | — |
+| `correlation_df()` | DataFrame | — |
+| `outliers_df()` | DataFrame | `format` (default='number') |
+| `pii_df()` | DataFrame | — |
+| `encoding_df()` | DataFrame | — |
+
+---
+
+## Understanding the API
+
+**The 5 Powerful Methods** are designed for comprehensive analysis in one call:
+- `statsall()` — Complete statistical & ML analysis
+- `mlall()` — Algorithm recommendations
+- `vizall()` — Auto-visualizations
+- `profile_column()` — Deep dive into one column
+- `compare()` — Schema drift detection
+
+**The 10 One-Liner Methods** are for interactive exploration and specific queries:
+- Return DataFrames directly for easy inspection
+- Support flexible formatting options (percentages, truncation, etc.)
+- Designed for quick analysis without boilerplate
+- Recommended for Jupyter notebooks and interactive workflows
+
+---
+
 ## Features
 
 | Feature | Description |
 |---|---|
-| **Three powerful methods** | `statsall()` full EDA, `vizall()` auto-charts, `mlall()` algorithm recommendations |
-| **Bonus methods** | `profile_column()` for deep dives, `compare()` for dataset drift detection |
+| **5 powerful methods** | `statsall()`, `mlall()`, `vizall()`, `profile_column()`, `compare()` |
+| **10 convenience methods** | Quick access to individual tables for interactive exploration |
 | Universal ingestion | CSV, Excel, JSON, XML, HTML, Parquet, Feather — 28 formats |
 | Native pandas accessor | `df.eda.*` — feels like pandas |
 | **ML-Ready Analysis** | Algorithm ratings, class imbalance detection, preprocessing pipeline with code |
@@ -152,39 +387,52 @@ import noweda as eda
 
 df = eda.read("data.csv")
 
-# Still a regular pandas DataFrame — nothing changes
-print(df.head())
-print(df.describe())
+# The 5 Powerful Methods — use these for comprehensive analysis
+df.eda.statsall()                    # Complete statistical analysis report
+df.eda.mlall()                       # ML algorithm recommendations & preprocessing
+df.eda.vizall()                      # Auto-render 9+ visualizations
+df.eda.profile_column('age')         # Deep dive into a single column
+df.eda.compare(df_test)              # Detect schema drift between datasets
 
-# NowEDA layer
-print(df.eda.insights())   # human-readable insight list
-print(df.eda.score())      # quality, risk, model_readiness
-print(df.eda.summary())    # raw plugin results
-report = df.eda.report()   # full structured dict
-
-# Power methods
-df.eda.statsall()                    # full rich report: dtypes + stats + scores + insights
-df.eda.vizall()                      # auto-render best charts for every column
-df.eda.mlall()                       # ML algorithm recommendations + preprocessing pipeline
-
-# Advanced methods
-df.eda.profile_column('age')         # deep dive into a single column
-df.eda.compare(df_test)              # detect schema drift between datasets
+# Optional: Quick-access one-liner methods for interactive exploration
+scores = df.eda.scores_df()          # Returns DataFrame with quality/readiness/risk scores
+insights = df.eda.insights_df()      # Returns DataFrame with insights
+schema = df.eda.schema_df()          # Returns DataFrame with column roles & types
+stats = df.eda.stats_df()            # Returns DataFrame with statistics
+missing = df.eda.missing_df()        # Returns DataFrame with missing data (default: %)
+missing = df.eda.missing_df(format='number')  # Show missing counts instead
+duplicates = df.eda.duplicates_df()  # Returns DataFrame with duplicate info
+corr = df.eda.correlation_df()       # Returns correlation matrix
+outliers = df.eda.outliers_df()      # Returns DataFrame with outlier counts (default: #)
+outliers = df.eda.outliers_df(format='percentage')  # Show outliers as %
+pii = df.eda.pii_df()                # Returns DataFrame with PII findings
+encoding = df.eda.encoding_df()      # Returns DataFrame with encoding signals
 ```
 
-### All supported formats
+### All Supported Formats
+
+NowEDA supports 28 file formats through pandas:
 
 ```python
 import noweda as eda
 
-df = eda.read("data.csv")
-df = eda.read("data.xlsx", sheet_name="Sheet1")
-df = eda.read("data.json")
-df = eda.read("data.xml")
-df = eda.read("data.html")
+df = eda.read("data.csv")               # CSV
+df = eda.read("data.xlsx")              # Excel (.xlsx, .xls, .ods)
+df = eda.read("data.json")              # JSON
+df = eda.read("data.xml")               # XML
+df = eda.read("data.html")              # HTML tables
+df = eda.read("data.parquet")           # Parquet
+df = eda.read("data.feather")           # Feather
+df = eda.read("data.h5")                # HDF5
+df = eda.read("data.sav")               # SPSS (.sav, .zsav)
 ```
 
-Any `**kwargs` are forwarded to the underlying pandas reader.
+Any `**kwargs` are forwarded to the underlying pandas reader:
+
+```python
+df = eda.read("data.xlsx", sheet_name="Sheet1")
+df = eda.read("data.json", orient="records")
+```
 
 ---
 
@@ -203,16 +451,6 @@ noweda data.csv --json report.json
 # Both at once
 noweda data.csv --html report.html --json report.json
 ```
-
----
-
-## Score Breakdown
-
-| Score | Range | Meaning |
-|---|---|---|
-| `data_quality` | 0–100 | Penalised for missing values, duplicates, constants, outliers |
-| `model_readiness` | 0–100 | Penalised for skew, untyped columns, high missingness |
-| `risk` | 0+ | Added per PII column (+15) and encoded column (+10) |
 
 ---
 

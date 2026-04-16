@@ -24,10 +24,6 @@ class NowEDAAccessor:
             engine = AutoEDAEngine(default_plugins())
             self._report = engine.run_df(self._df)
 
-    def summary(self):
-        self._ensure_analyzed()
-        return self._report["results"]
-
     def insights(self):
         self._ensure_analyzed()
         return self._report["insights"]
@@ -37,8 +33,300 @@ class NowEDAAccessor:
         return self._report["scores"]
 
     def report(self):
+        """Return the complete analysis report dict (for programmatic use, e.g., HTML export)."""
         self._ensure_analyzed()
         return self._report
+
+    # ────────────────────────────────────────────────────────────────────────
+    # Convenience one-liner methods — Quick access to individual tables
+    # ────────────────────────────────────────────────────────────────────────
+
+    def scores_df(self):
+        """Return data quality, model readiness, and risk scores as a DataFrame.
+
+        Returns:
+            DataFrame with shape (3, 1) containing:
+                - data_quality (0-100): Score penalised for missing values, duplicates, constants, outliers
+                - model_readiness (0-100): Score penalised for skew, untyped columns, high missingness
+                - risk (0+): Score incremented per PII column (+15) and encoded column (+10)
+
+        Example:
+            scores = df.eda.scores_df()
+            print(scores)
+            #               Value
+            # data_quality    87.5
+            # model_readiness  82.1
+            # risk            15.0
+        """
+        self._ensure_analyzed()
+        scores = self._report["scores"]
+        return pd.DataFrame(scores, index=[0]).T.rename(columns={0: "Value"})
+
+    def insights_df(self, full_line=True):
+        """Return human-readable insights about data quality, patterns, and issues as a DataFrame.
+
+        Parameters:
+            full_line (bool, default=True): If True, display complete insight text. If False, truncate
+                insights to ~50 characters for compact display in notebooks.
+
+        Returns:
+            DataFrame with single column 'Insight' containing human-readable findings.
+
+        Example:
+            # Full insights (default)
+            insights = df.eda.insights_df()
+
+            # Compact insights (truncated for brief review)
+            insights_compact = df.eda.insights_df(full_line=False)
+        """
+        self._ensure_analyzed()
+        insights = self._report["insights"]
+
+        if full_line:
+            df_result = pd.DataFrame({"Insight": insights})
+        else:
+            truncated = [text[:50] + "..." if len(text) > 50 else text for text in insights]
+            df_result = pd.DataFrame({"Insight": truncated})
+
+        # Set pandas display options to show full content
+        with pd.option_context('display.max_colwidth', None):
+            pass
+
+        return df_result
+
+    def schema_df(self):
+        """Return inferred column roles, types, and confidence scores as a DataFrame.
+
+        NowEDA automatically detects column roles (id, categorical, numeric, datetime, text)
+        and provides confidence scores for each inference.
+
+        Returns:
+            DataFrame with columns: [Column, Role, Type, Confidence]
+                - Column: Column name
+                - Role: Inferred role (id, categorical, numeric, datetime, text, unknown)
+                - Type: Detected dtype
+                - Confidence: Confidence score (0-1) for the inferred role
+
+        Example:
+            schema = df.eda.schema_df()
+            print(schema)
+            #      Column       Role      Type  Confidence
+            # 0      user_id        id     int64        0.99
+            # 1      age      numeric   int64        0.95
+            # 2      name         text    object       0.88
+            # 3      signup_date  datetime  datetime64   0.98
+        """
+        self._ensure_analyzed()
+        schema = self._report["results"].get("schema", {})
+        df_result = pd.DataFrame(schema).T
+        df_result.index.name = "Column"
+        return df_result.reset_index()
+
+    def stats_df(self):
+        """Return descriptive statistics for numeric columns as a DataFrame.
+
+        Returns:
+            DataFrame with columns: [Column, Mean, Std, Min, Q1, Median, Q3, Max, Skewness, Kurtosis]
+                Includes statistics for all numeric columns in the dataset.
+
+        Example:
+            stats = df.eda.stats_df()
+            print(stats)
+            #      Column      Mean       Std       Min        Q1  Median    Q3       Max  Skewness  Kurtosis
+            # 0       age     45.2     15.3      18.0      34.0   45.0  58.0     85.0      -0.12      -0.45
+            # 1    salary  65000.0  25000.0  30000.0  50000.0 65000.0 80000.0 150000.0      0.85       1.20
+        """
+        self._ensure_analyzed()
+        stats = self._report["results"].get("stats", {})
+        df_result = pd.DataFrame(stats).T
+        df_result.index.name = "Column"
+        return df_result.reset_index()
+
+    def missing_df(self, format="percentage"):
+        """Return missing data rates per column as a DataFrame.
+
+        Parameters:
+            format (str, default='percentage'): Display format for missing data.
+                - 'percentage': Show as % (e.g., "15.3%")
+                - 'number': Show as absolute count (e.g., 306 missing values)
+
+        Returns:
+            DataFrame with columns: [Column, Missing_Data]
+
+        Example:
+            # Default: show missing data as percentage
+            missing = df.eda.missing_df()
+            print(missing)
+            #        Column Missing_Data
+            # 0         age          2.5%
+            # 1       salary         15.3%
+
+            # Alternative: show absolute missing counts
+            missing = df.eda.missing_df(format='number')
+            print(missing)
+            #        Column Missing_Data
+            # 0         age            50
+            # 1       salary          306
+        """
+        self._ensure_analyzed()
+        missing = self._report["results"].get("missing", {})
+        df_out = pd.DataFrame(list(missing.items()), columns=["Column", "Missing_Data"])
+
+        if format == "number":
+            # Convert to counts (missing value count per column)
+            df_out["Missing_Data"] = (df_out["Missing_Data"] * len(self._df)).astype(int)
+        else:  # percentage
+            df_out["Missing_Data"] = df_out["Missing_Data"].apply(lambda x: f"{x*100:.1f}%")
+
+        return df_out
+
+    def duplicates_df(self):
+        """Return duplicate rows and constant column information as a DataFrame.
+
+        Returns:
+            DataFrame with 3-row structure showing:
+                - Total Rows: Total number of rows in dataset
+                - Duplicate Rows: Count of exactly duplicate rows
+                - Constant Columns: List of columns with only one unique value
+
+        Example:
+            duplicates = df.eda.duplicates_df()
+            print(duplicates)
+            #                   Metric  Value
+            # 0             Total Rows  2000
+            # 1        Duplicate Rows    15
+            # 2      Constant Columns     3
+        """
+        self._ensure_analyzed()
+        dups = self._report["results"].get("duplicates", {})
+        return pd.DataFrame({
+            "Metric": ["Total Rows", "Duplicate Rows", "Constant Columns"],
+            "Value": [
+                len(self._df),
+                dups.get("duplicate_rows", 0),
+                ", ".join(dups.get("constant_columns", [])) or "None"
+            ]
+        })
+
+    def correlation_df(self):
+        """Return Pearson correlation matrix between all numeric columns as a DataFrame.
+
+        Returns:
+            DataFrame: Symmetric correlation matrix where each cell [i,j] represents
+                the Pearson correlation coefficient between columns i and j.
+                Values range from -1 to 1 (perfect negative to perfect positive correlation).
+
+        Example:
+            corr = df.eda.correlation_df()
+            print(corr)
+            #            age    salary    score
+            # age       1.00     0.65     0.42
+            # salary    0.65     1.00     0.78
+            # score     0.42     0.78     1.00
+
+        Notes:
+            - Only numeric columns are included
+            - Perfect correlation (±1.0) indicates linear dependence
+            - High correlation (|r| > 0.85) may indicate multicollinearity issues
+        """
+        self._ensure_analyzed()
+        corr = self._report["results"].get("correlation", {})
+        return pd.DataFrame(corr)
+
+    def outliers_df(self, format="number"):
+        """Return outlier counts per numeric column as a DataFrame.
+
+        Uses IQR (Interquartile Range) method to detect outliers:
+            - Values below Q1 - 1.5*IQR or above Q3 + 1.5*IQR are flagged as outliers
+
+        Parameters:
+            format (str, default='number'): Display format for outlier counts.
+                - 'number': Show absolute outlier counts (e.g., 12 outliers)
+                - 'percentage': Show as % of total rows (e.g., "0.6%")
+
+        Returns:
+            DataFrame with columns: [Column, Outliers]
+
+        Example:
+            # Default: show outlier counts
+            outliers = df.eda.outliers_df()
+            print(outliers)
+            #      Column  Outliers
+            # 0       age         12
+            # 1    salary         25
+
+            # Alternative: show outliers as percentage
+            outliers = df.eda.outliers_df(format='percentage')
+            print(outliers)
+            #      Column  Outliers
+            # 0       age      0.6%
+            # 1    salary      1.2%
+        """
+        self._ensure_analyzed()
+        outliers = self._report["results"].get("outliers", {})
+        df_out = pd.DataFrame(list(outliers.items()), columns=["Column", "Outliers"])
+
+        if format == "percentage":
+            # Convert to percentage of rows
+            df_out["Outliers"] = (df_out["Outliers"] / len(self._df) * 100).apply(lambda x: f"{x:.1f}%")
+
+        return df_out
+
+    def pii_df(self):
+        """Return detected Personally Identifiable Information (PII) as a DataFrame.
+
+        NowEDA scans for common PII patterns including:
+            - Email addresses
+            - Phone numbers (extensible)
+            - Social Security Numbers (extensible)
+            - Credit card numbers (extensible)
+
+        Returns:
+            DataFrame with columns: [Column, PII_Type]
+                - Column: Column name containing PII
+                - PII_Type: Type of PII detected (e.g., 'email', 'phone', 'ssn')
+
+            Returns empty DataFrame if no PII detected.
+
+        Example:
+            pii = df.eda.pii_df()
+            print(pii)
+            #        Column PII_Type
+            # 0  customer_email    email
+            # 1  user_phone     phone
+        """
+        self._ensure_analyzed()
+        pii = self._report["results"].get("pii", {})
+        if not pii:
+            return pd.DataFrame({"Column": [], "PII_Type": []})
+        return pd.DataFrame(list(pii.items()), columns=["Column", "PII_Type"])
+
+    def encoding_df(self):
+        """Return detected encoding signals in data columns as a DataFrame.
+
+        NowEDA detects signs of encoded or obfuscated data, including:
+            - Base64-encoded strings
+            - Obfuscation patterns (e.g., 'xxxxxxxx****')
+
+        Returns:
+            DataFrame with columns: [Column, Encoding_Type]
+                - Column: Column name with detected encoding
+                - Encoding_Type: Type of encoding signal (e.g., 'base64', 'obfuscation')
+
+            Returns empty DataFrame if no encoding signals detected.
+
+        Example:
+            encoding = df.eda.encoding_df()
+            print(encoding)
+            #        Column       Encoding_Type
+            # 0  customer_id    base64_signal
+            # 1  secret_key    obfuscation
+        """
+        self._ensure_analyzed()
+        encoding = self._report["results"].get("encoding", {})
+        if not encoding:
+            return pd.DataFrame({"Column": [], "Encoding_Type": []})
+        return pd.DataFrame(list(encoding.items()), columns=["Column", "Encoding_Type"])
 
     def statsall(self):
         """Print a rich full-analysis report to the terminal/notebook.

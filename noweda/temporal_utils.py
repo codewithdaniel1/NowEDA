@@ -10,6 +10,7 @@ def detect_temporal_columns(df):
 
     Returns: dict of {column_name: (dtype, frequency, confidence)}
     """
+    import warnings
     temporal = {}
 
     for col in df.columns:
@@ -22,7 +23,9 @@ def detect_temporal_columns(df):
         # Try parsing object columns as datetime
         if df[col].dtype == "object":
             try:
-                parsed = pd.to_datetime(df[col], errors="coerce")
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    parsed = pd.to_datetime(df[col], errors="coerce", infer_datetime_format=True)
                 # Check if >80% of values parsed successfully
                 valid_pct = parsed.notna().sum() / len(df)
                 if valid_pct > 0.8:
