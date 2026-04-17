@@ -1,8 +1,8 @@
 [project]
 name = "noweda"
-version = "0.1.0"
+version = "0.1.1"
 description = "Automated EDA with insights, scoring, and security-aware detection — built as a native pandas extension."
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.8"
