@@ -68,6 +68,93 @@ def read(file_path, **kwargs):
     return loader(file_path, **kwargs)
 
 
+def read_chunked(file_path, chunksize=10_000, concat=True, **kwargs):
+    """
+    Read a large CSV or JSON file in chunks to avoid loading it all into memory.
+
+    This is useful for files larger than available RAM. Pandas natively supports
+    chunked reading via the `chunksize` parameter for CSV and JSON files.
+
+    Supported formats for chunked reading
+    ----------
+    .csv  .tsv  .tab  .txt  — delimited text (any delimiter)
+    .json  .jsonl           — JSON and newline-delimited JSON
+
+    Other formats (Excel, Parquet, XML, etc.) do not support chunked iteration
+    and must be read with the standard `read()` function.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to a CSV, TSV, or JSON file.
+    chunksize : int, default 10_000
+        Number of rows to read per chunk.
+    concat : bool, default True
+        If True, concatenate all chunks into a single DataFrame and return it.
+        If False, return a generator yielding chunk DataFrames one at a time
+        (memory-efficient for large files).
+    **kwargs
+        Forwarded directly to the underlying pandas reader
+        (e.g. sep='|' for custom CSV, na_values=['NA'], etc.).
+
+    Returns
+    -------
+    pandas.DataFrame (if concat=True) or generator of DataFrames (if concat=False)
+        If concat=True: a single DataFrame with all rows concatenated.
+        If concat=False: a generator that yields one chunk at a time.
+
+    Raises
+    ------
+    ValueError
+        If the file format does not support chunked reading.
+    FileNotFoundError
+        If the file does not exist.
+
+    Example
+    -------
+    >>> import noweda as eda
+    >>> # Read a large CSV in chunks and concatenate into one DataFrame
+    >>> df = eda.read_chunked('huge_file.csv', chunksize=50_000)
+    >>> len(df)  # Total rows
+    5000000
+
+    >>> # Process chunks one at a time without loading all into memory
+    >>> for chunk in eda.read_chunked('huge_file.csv', chunksize=50_000, concat=False):
+    ...     print(chunk.shape)  # Process each chunk
+    ...     # (50000, 10)
+    ...     # (50000, 10)
+    ...     # ...
+    """
+    ext = _extension(file_path)
+
+    if ext not in _CHUNKED_FORMATS:
+        supported = ", ".join(sorted(_CHUNKED_FORMATS))
+        raise ValueError(
+            f"Chunked reading is only supported for: {supported}\n"
+            f"Got: '{ext}'. Use eda.read() for other formats (Excel, XML, etc.)."
+        )
+
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    # Get iterator from appropriate loader
+    if ext in (".csv", ".tsv", ".tab", ".txt"):
+        # Set default separator for TSV/TAB
+        if ext in (".tsv", ".tab"):
+            kwargs.setdefault("sep", "\t")
+        iterator = pd.read_csv(file_path, chunksize=chunksize, **kwargs)
+    else:  # .json or .jsonl
+        # Default to newline-delimited JSON
+        kwargs.setdefault("lines", True)
+        iterator = pd.read_json(file_path, chunksize=chunksize, **kwargs)
+
+    # Return either concatenated or as generator
+    if concat:
+        return pd.concat(list(iterator), ignore_index=True)
+    else:
+        return iterator
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -154,6 +241,12 @@ def _require(package, extra, fmt):
             f"Install it with:  pip install noweda[{extra}]"
         ) from None
 
+
+# ---------------------------------------------------------------------------
+# Formats that support chunked reading via pandas
+# ---------------------------------------------------------------------------
+
+_CHUNKED_FORMATS = {".csv", ".tsv", ".tab", ".txt", ".json", ".jsonl"}
 
 # ---------------------------------------------------------------------------
 # Extension → loader dispatch table

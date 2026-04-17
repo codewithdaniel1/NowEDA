@@ -71,6 +71,34 @@ Auto-renders 7+ types of publication-quality charts (no matplotlib code needed):
 - **Correlation heatmap** — Pearson correlations between all numeric columns
 - **Time-series plots** — Line charts for datetime columns + numeric trends
 
+**Smart Column Filtering:**
+
+`vizall()` automatically excludes unhelpful columns from visualization:
+
+- **ID columns** — customer_id, user_id, record_id, etc. (not useful for pattern analysis)
+- **High-cardinality PII (string)** — email addresses, etc. (>95% unique strings)
+- **Numeric PII** — credit_card, ssn, account_number, zip codes, etc. (no meaning as features)
+- **Continuous numeric features** — account_balance, transaction_count, etc. (kept for analysis!)
+
+This ensures visualizations focus on meaningful patterns, not noise from identifiers.
+
+**For Large Datasets (>50K rows):**
+
+By default, `vizall()` automatically samples 10,000 rows for visualization while keeping full-dataset analysis:
+
+```python
+# Automatic sampling for large files (no code change needed)
+df.eda.vizall()  # 100K rows → renders charts from 10K sample
+
+# Custom sample size
+df.eda.vizall(sample=5_000)  # Use 5,000 rows for visualization
+
+# No sampling (full dataset, may be slow)
+df.eda.vizall(sample=False)  # Use all 100K rows (warning: slow on huge files)
+```
+
+**Note:** Sampling is only for visualization speed. All statistical analysis (`statsall()`, `scores_df()`, etc.) always uses the complete dataset.
+
 ### 4. `df.eda.profile_column(column_name)` — Deep Dive Into a Single Column
 
 Detailed analysis of one column for understanding distributions and transformations:
@@ -135,14 +163,33 @@ print(scores)
 #### `df.eda.insights_df(full_line=True)`
 Returns a DataFrame with human-readable insights about data quality, patterns, and issues.
 
+**Insights include:**
+- **Identifier columns** — Detected customer_id, user_id, etc. columns
+- **Low-cardinality categoricals** — first_name, last_name, region, etc.
+- **Temporal columns** — Detected datetime columns with frequency/seasonality analysis
+- **Missing data patterns** — Columns with missingness
+- **PII warnings** — Email addresses, phone numbers, SSNs, credit cards found (actionable alerts)
+- **Encoded data detection** — Base64 or other obfuscation
+- **Data quality assessment** — Overall scoring and risk levels
+
 **Parameters:**
 - `full_line` (bool, default=True) — If True, shows complete insight text. If False, truncates at ~50 characters for compact display.
 
 **Returns:** DataFrame with columns: `[Insight]`
 
+**Example:**
 ```python
 # Full insights (default)
 insights = df.eda.insights_df()
+
+# Output example:
+# Likely identifier column(s) detected: customer_id. Consider dropping...
+# Columns with low cardinality (likely categorical): first_name, last_name
+# Datetime column(s) detected: last_transaction, signup_date. Temporal...
+# PII detected in column 'email': 95 email address(es), 0 phone number(s). Mask...
+# PII detected in column 'phone': 87 phone number(s). Mask or remove...
+# High risk level (70). Sensitive data likely present.
+# Data quality score is excellent (>=95).
 
 # Compact insights (truncated for brief review)
 insights = df.eda.insights_df(full_line=False)
@@ -273,14 +320,18 @@ print(outliers)
 #### `df.eda.pii_df()`
 Returns a DataFrame listing all detected PII (Personally Identifiable Information) fields.
 
-**Returns:** DataFrame with columns: `[Column, PII_Type, Sample]`
+**Returns:** DataFrame with columns: `[Column, PII_Type, Count]`
+- **Column**: Column name containing PII
+- **PII_Type**: Type of PII detected ('email', 'phone', 'ssn', 'credit_card')
+- **Count**: Number of values matching this PII pattern
 
 ```python
 pii = df.eda.pii_df()
 print(pii)
-#        Column PII_Type                Sample
-# 0  customer_email    email  john@example.com
-# 1  user_address    email   sarah@test.org
+#        Column     PII_Type  Count
+# 0  customer_email      email  95017
+# 1  customer_phone      phone  89875
+# 2  ssn_column           ssn  84941
 ```
 
 ---
@@ -434,6 +485,261 @@ df = eda.read("data.xlsx", sheet_name="Sheet1")
 df = eda.read("data.json", orient="records")
 ```
 
+### Chunked Ingestion for Large Files
+
+For files larger than available RAM, use `read_chunked()` to process data in chunks. This is essential for datasets that would otherwise exhaust system memory.
+
+#### Mode 1: Concatenate All Chunks (Simpler)
+
+Read the entire file in chunks, but automatically concatenate into a single DataFrame:
+
+```python
+# Read a 10 GB CSV file in 100k-row chunks, return single concatenated DataFrame
+df = eda.read_chunked("huge_file.csv", chunksize=100_000)
+print(df.shape)  # Full dataset shape
+
+# Run NowEDA analysis on the complete concatenated result
+scores = df.eda.scores_df()
+pii = df.eda.pii_df()
+```
+
+**Use this when:** Your data fits in RAM after being read, but you want to avoid holding the entire file on disk in memory during the read operation.
+
+#### Mode 2: Process Chunks One-at-a-Time (Memory-Efficient)
+
+Iterate through chunks without concatenating—only one chunk in memory at a time:
+
+```python
+# Process a 1 TB JSON file in 50k-row chunks—never load more than 50k rows
+for chunk in eda.read_chunked("massive_file.json", chunksize=50_000, concat=False):
+    print(f"Processing {chunk.shape[0]} rows...")
+    
+    # Analyze this chunk
+    chunk_pii = chunk.eda.pii_df()
+    chunk_scores = chunk.eda.scores_df()
+    
+    # Save results, upload, or aggregate
+    process_and_save(chunk_pii)
+```
+
+**Use this when:** Your final dataset is too large to fit in RAM, or you need to process data in a streaming fashion (e.g., aggregate results across chunks).
+
+#### Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `file_path` | — | Path to `.csv`, `.tsv`, `.json`, `.jsonl`, or `.txt` file |
+| `chunksize` | `10_000` | Number of rows per chunk. Larger chunks = fewer iterations but more memory |
+| `concat` | `True` | If `True`, concatenate all chunks into one DataFrame. If `False`, return a generator |
+| `**kwargs` | — | Forward to pandas reader (`sep='\|'` for custom CSV delimiters, `lines=True` for JSONL, etc.) |
+
+#### Supported Formats
+
+- ✓ `.csv`, `.tsv`, `.tab`, `.txt` — Delimited text
+- ✓ `.json`, `.jsonl` — JSON and newline-delimited JSON
+
+Other formats (Excel, Parquet, XML, HDF5, etc.) must be read with the standard `read()` function.
+
+#### Examples
+
+```python
+import noweda as eda
+import pandas as pd
+
+# Example 1: Read a large CSV with custom delimiter
+df = eda.read_chunked("data.csv", chunksize=50_000, sep=";")
+
+# Example 2: Aggregate stats across chunks (memory-efficient)
+all_stats = []
+for chunk in eda.read_chunked("huge_file.csv", chunksize=20_000, concat=False):
+    stats = chunk.eda.stats_df()
+    all_stats.append(stats)
+combined_stats = pd.concat(all_stats)
+
+# Example 3: Detect PII across large JSON dataset
+for i, chunk in enumerate(eda.read_chunked("large.jsonl", chunksize=100_000, concat=False)):
+    pii = chunk.eda.pii_df()
+    if len(pii) > 0:
+        print(f"Chunk {i}: Found {len(pii)} PII instances")
+        pii.to_csv(f"pii_chunk_{i}.csv", index=False)
+
+# Example 4: Process TSV with missing value handling
+df = eda.read_chunked("data.tsv", chunksize=50_000, na_values=['NA', 'N/A', ''])
+
+# Example 5: Stream large JSON Lines file for real-time processing
+total_records = 0
+for chunk in eda.read_chunked("events.jsonl", chunksize=10_000, concat=False):
+    total_records += len(chunk)
+    # Process chunk: save to database, filter, aggregate, etc.
+    scores = chunk.eda.scores_df()
+    print(f"Processed {total_records:,} records...")
+```
+
+#### Choosing the Right Mode
+
+| Scenario | Method | Rationale |
+|----------|--------|-----------|
+| File fits in RAM after loading | `read_chunked(..., concat=True)` | Simpler API, faster analysis, data fits memory |
+| File is larger than RAM | `read_chunked(..., concat=False)` | Essential for truly large files; prevents memory overflow |
+| Need to save results per-chunk | `concat=False` + loop | Export, upload, or persist chunks before next one |
+| Analyzing for quality metrics | `concat=True` | Get full dataset stats in one call |
+| Real-time stream processing | `concat=False` + loop | Process and discard chunks incrementally |
+| Detecting PII across dataset | Either | Both work; `concat=False` is better for huge files |
+
+#### Memory Usage Tips
+
+- **Chunk size matters**: Larger chunks = fewer loops but more memory per iteration
+  - Start with 10,000-50,000 rows depending on column count and data types
+  - For very wide tables (100+ columns), use smaller chunks
+  - For simple numeric data, use larger chunks (100,000+)
+
+- **Monitor memory**: On a machine with 16 GB RAM, you can typically hold 5-10 million rows
+
+- **Custom parameters matter**: `dtype={'col': 'int32'}` or `na_values` can reduce memory usage
+  ```python
+  df = eda.read_chunked("data.csv", chunksize=50_000, dtype={'id': 'int32', 'category': 'category'})
+  ```
+
+#### When to Use `read_chunked()` vs `read()`
+
+Use `read_chunked()` when:
+- File is > 500 MB
+- Available RAM is < 3× file size
+- You need to process data in batches
+- You're doing streaming/real-time analysis
+
+Use standard `read()` when:
+- File is < 100 MB
+- RAM available is > 10× file size
+- You need fast analysis of the complete dataset
+- You're using formats like Excel, Parquet, XML, HDF5 (which don't support chunking)
+
+---
+
+## How-To Guide: Chunked Ingestion
+
+### Real-World Scenario: Processing Customer Data (100,000+ rows)
+
+**Problem:** You have a `customer_data.csv` (19.5 MB, 100,000 rows) that takes 15 seconds to load all at once. You want to detect PII, check data quality, and save findings without waiting.
+
+**Solution: Stream with Chunked Ingestion**
+
+```python
+import noweda as eda
+import pandas as pd
+
+FILE = 'customer_data.csv'
+
+# Method 1: Quick Quality Check (load all, analyze once)
+print("Loading customer data...")
+df = eda.read_chunked(FILE, chunksize=25_000)  # Reads in 4 chunks, returns 1 DataFrame
+
+scores = df.eda.scores_df()
+pii = df.eda.pii_df()
+print(f"Data Quality Score: {scores.loc['data_quality', 'Value']:.1f}")
+print(f"PII Detected: {len(pii)} instances across {pii['Column'].nunique()} columns")
+```
+
+```python
+# Method 2: Chunk-by-chunk Analysis (for very large files or real-time processing)
+print("Streaming customer data...")
+
+all_pii = []
+chunk_count = 0
+
+for chunk in eda.read_chunked(FILE, chunksize=25_000, concat=False):
+    chunk_count += 1
+    
+    # Analyze this chunk
+    pii = chunk.eda.pii_df()
+    if len(pii) > 0:
+        pii['chunk_num'] = chunk_count
+        all_pii.append(pii)
+    
+    # Example: Save chunk analysis
+    chunk.eda.scores_df().to_csv(f'scores_chunk_{chunk_count}.csv')
+    
+    print(f"✓ Processed chunk {chunk_count} ({len(chunk):,} rows)")
+
+# Combine all PII findings
+if all_pii:
+    combined_pii = pd.concat(all_pii, ignore_index=True)
+    print(f"\n✓ Found {combined_pii['Count'].sum():,} PII instances across {chunk_count} chunks")
+    combined_pii.to_csv('all_pii_findings.csv', index=False)
+```
+
+### Common Patterns
+
+**Pattern 1: Batch Processing**
+```python
+# Export one CSV per chunk
+for i, chunk in enumerate(eda.read_chunked('data.csv', chunksize=50_000, concat=False), 1):
+    chunk.to_csv(f'batch_{i:03d}.csv', index=False)
+    print(f"Saved batch {i}")
+```
+
+**Pattern 2: Aggregating Metrics**
+```python
+# Collect statistics across all chunks
+stats_list = []
+for chunk in eda.read_chunked('data.csv', chunksize=100_000, concat=False):
+    stats_list.append(chunk.eda.stats_df())
+
+combined_stats = pd.concat(stats_list).groupby(level=0).mean()
+print(combined_stats)
+```
+
+**Pattern 3: Filtering & Saving**
+```python
+# Find and export rows matching certain criteria
+for chunk in eda.read_chunked('data.csv', chunksize=50_000, concat=False):
+    # Filter: keep only high-risk records
+    pii = chunk.eda.pii_df()
+    high_risk = chunk[chunk['risk_score'] > 75]
+    
+    if len(high_risk) > 0:
+        high_risk.to_csv('high_risk_records.csv', mode='a', index=False)
+```
+
+**Pattern 4: Real-Time Monitoring**
+```python
+# Process as-it-arrives with early stopping
+for i, chunk in enumerate(eda.read_chunked('data.csv', chunksize=10_000, concat=False)):
+    pii = chunk.eda.pii_df()
+    
+    # Alert if PII found
+    if len(pii) > 0:
+        print(f"⚠️  ALERT: PII detected in chunk {i+1}")
+        print(pii)
+    
+    # Stop early if we find enough issues
+    if i > 100:  # Only scan first 100 chunks for speed
+        print("Stopping after 100 chunks for quick review")
+        break
+```
+
+### Quick Reference: Chunked Ingestion
+
+**30-second summary:**
+
+```python
+# Load large file, return single DataFrame
+df = eda.read_chunked("huge_file.csv", chunksize=50_000)
+
+# Or stream chunks one at a time (memory efficient)
+for chunk in eda.read_chunked("huge_file.csv", chunksize=50_000, concat=False):
+    pii = chunk.eda.pii_df()  # Analyze each chunk
+```
+
+| Question | Answer |
+|----------|--------|
+| File fits in RAM? | Use `concat=True` (default) — get single DataFrame |
+| File > RAM? | Use `concat=False` — iterate chunks, minimal memory |
+| Supported formats? | CSV, TSV, JSON, JSONL, TXT. Not: Excel, Parquet, XML, HDF5 |
+| Memory concerns? | See "Memory Usage Tips" section above |
+| Detect PII large file? | See "Common Patterns" → "Pattern 3" above |
+| Need help? | See "How-To Guide: Chunked Ingestion" section above |
+
 ---
 
 ## CLI
@@ -456,44 +762,205 @@ noweda data.csv --html report.html --json report.json
 
 ## Plugin System
 
-Every analysis step is an independent plugin. You can swap, extend, or disable plugins.
+Every analysis step is an independent plugin. You can run all plugins together (default), or cherry-pick specific plugins for custom analysis workflows. This is useful when you want lightweight analysis without running the full suite.
+
+### Built-in Plugins
+
+| Plugin | Returns | Key Use Case |
+|---|---|---|
+| `SchemaPlugin` | Column roles & types with confidence scores | Understand data structure and inferred column purposes |
+| `StatsPlugin` | Descriptive statistics per column | Analyze distributions, skewness, quartiles |
+| `MissingDataPlugin` | Missing value rates | Assess data completeness |
+| `DuplicatesPlugin` | Duplicate rows & constant columns | Identify redundancy and zero-variance features |
+| `CorrelationPlugin` | Pearson correlation matrix | Detect multicollinearity and feature relationships |
+| `OutlierPlugin` | IQR-based outlier counts | Identify anomalous values per column |
+| `PIIDetectorPlugin` | PII column findings | Flag columns containing sensitive data (emails, phone, SSN, credit cards) |
+| `EncodingDetectionPlugin` | Encoding signals | Detect Base64 or obfuscated data |
+
+### Running All Plugins (Default)
+
+When you call the 5 powerful methods (`statsall()`, `mlall()`, etc.), all 8 plugins run automatically:
 
 ```python
 import noweda as eda
+
+df = eda.read("data.csv")
+
+# This runs ALL plugins internally
+df.eda.statsall()  # Reports include schema, stats, missing, duplicates, correlation, outliers, pii, encoding
+```
+
+### Running Specific Plugins Only
+
+Run a subset of plugins for lighter-weight analysis:
+
+```python
 from noweda.core.engine import AutoEDAEngine
 from noweda.plugins.missing import MissingDataPlugin
 from noweda.plugins.pii import PIIDetectorPlugin
+from noweda.plugins.outliers import OutlierPlugin
 
-# Run only the plugins you want
-engine = AutoEDAEngine([MissingDataPlugin(), PIIDetectorPlugin()])
+# Example 1: Check only for data quality issues (missing + duplicates + outliers)
+engine = AutoEDAEngine([
+    MissingDataPlugin(),
+    OutlierPlugin(),
+])
 report = engine.run_df(df)
+
+# Access results
+missing_data = report['results']['missing']    # Dict: {col_name: missing_rate}
+outlier_counts = report['results']['outliers']  # Dict: {col_name: count}
+
+# Example 2: Check only for security/privacy issues (PII + encoding)
+from noweda.plugins.encoding import EncodingDetectionPlugin
+
+engine = AutoEDAEngine([
+    PIIDetectorPlugin(),
+    EncodingDetectionPlugin(),
+])
+report = engine.run_df(df)
+
+pii_findings = report['results']['pii']           # Dict: {col_name: pii_type}
+encoding_signals = report['results']['encoding']  # Dict: {col_name: encoding_type}
+
+# Example 3: Schema + Stats only (lightweight column analysis)
+from noweda.plugins.schema import SchemaPlugin
+from noweda.plugins.stats import StatsPlugin
+
+engine = AutoEDAEngine([
+    SchemaPlugin(),
+    StatsPlugin(),
+])
+report = engine.run_df(df)
+
+schema_info = report['results']['schema']  # Dict: {col_name: {dtype, role, confidence}}
+stats_info = report['results']['stats']    # Dict: {col_name: {mean, std, min, max, ...}}
+
+print("Column Roles:")
+for col, info in schema_info.items():
+    print(f"  {col}: {info['role']} (confidence: {info['confidence']:.2f})")
+
+print("\nMissing Rates:")
+for col, rate in missing_data.items():
+    if rate > 0:
+        print(f"  {col}: {rate*100:.1f}%")
 ```
 
-### Built-in plugins
+### Understanding Plugin Output
 
-| Plugin | Name key | What it detects |
-|---|---|---|
-| `SchemaPlugin` | `schema` | Column roles: id, categorical, numeric, datetime, text |
-| `StatsPlugin` | `stats` | Descriptive stats: mean, median, std, skewness, etc. |
-| `MissingDataPlugin` | `missing` | Per-column missing rate |
-| `DuplicatesPlugin` | `duplicates` | Duplicate rows, constant columns |
-| `CorrelationPlugin` | `correlation` | Pearson correlation matrix (numeric columns) |
-| `OutlierPlugin` | `outliers` | IQR-based outlier counts per column |
-| `PIIDetectorPlugin` | `pii` | Email addresses (extensible to SSN, phone, etc.) |
-| `EncodingDetectionPlugin` | `encoding` | Base64-encoded strings |
+Each plugin returns a dictionary under `report['results'][plugin_name]`:
 
-### Writing a custom plugin
+#### SchemaPlugin Output
+```python
+{
+    'user_id': {'dtype': 'int64', 'role': 'id', 'confidence': 0.99, 'unique': 1000, 'uniqueness_ratio': 1.0},
+    'email': {'dtype': 'object', 'role': 'text', 'confidence': 0.85, 'unique': 998, 'uniqueness_ratio': 0.998},
+    'age': {'dtype': 'int64', 'role': 'numeric', 'confidence': 0.98, 'unique': 60, 'uniqueness_ratio': 0.06}
+}
+```
+
+**Key Fields:**
+- `role`: Detected column type (id, numeric, categorical, datetime, text)
+- `confidence`: How confident (0-1) the schema detection is
+- `unique`: Count of unique values
+- `uniqueness_ratio`: Unique / total rows
+
+#### StatsPlugin Output
+```python
+{
+    'age': {
+        'dtype': 'int64',
+        'count': 1000,
+        'missing': 5,
+        'unique': 60,
+        'mean': 35.2,
+        'median': 34.0,
+        'std': 12.5,
+        'min': 18.0,
+        'max': 85.0,
+        'q25': 28.0,
+        'q75': 42.0,
+        'skewness': 0.15
+    }
+}
+```
+
+#### MissingDataPlugin Output
+```python
+{
+    'user_id': 0.0,
+    'age': 0.005,  # 0.5% missing
+    'salary': 0.02  # 2% missing
+}
+```
+
+#### OutlierPlugin Output
+```python
+{
+    'age': 3,      # 3 outliers detected
+    'salary': 15,  # 15 outliers detected
+    'score': 0     # No outliers
+}
+```
+
+#### PIIDetectorPlugin Output
+```python
+{
+    'customer_email': {'email': 42, 'phone': 3},  # Multiple PII types per column
+    'ssn_field': {'ssn': 50},
+    'card_number': {'credit_card': 28},  # Luhn-validated
+    'notes': {'email': 5, 'phone': 2}
+}
+```
+
+NowEDA detects four types of PII:
+- **Email**: `user@example.com`
+- **Phone**: `(555) 123-4567`, `555-123-4567`, `+1-800-555-1234`, etc. (US/intl formats)
+- **SSN**: `123-45-6789` or `123 45 6789` format
+- **Credit Card**: Visa, Mastercard, Amex, Discover with Luhn algorithm validation to reduce false positives
+
+### Writing a Custom Plugin
+
+Build your own plugin to add custom analysis:
 
 ```python
-import noweda as eda
 from noweda.plugins.base import BasePlugin
+from noweda.core.engine import AutoEDAEngine
 
-class MyPlugin(BasePlugin):
-    name = "my_check"
+class CustomQualityPlugin(BasePlugin):
+    """Example: Flag columns with low cardinality."""
+    name = "custom_quality"
 
     def run(self, df):
-        # return any JSON-serialisable dict
-        return {"total_rows": len(df)}
+        results = {}
+        for col in df.columns:
+            unique_ratio = df[col].nunique() / len(df)
+            if unique_ratio < 0.05:  # Less than 5% unique values
+                results[col] = f"Low cardinality ({unique_ratio:.1%})"
+        return results
+
+# Use your custom plugin
+custom_plugin = CustomQualityPlugin()
+engine = AutoEDAEngine([custom_plugin])
+report = engine.run_df(df)
+
+print(report['results']['custom_quality'])
+```
+
+### Combining Plugins
+
+Mix and match built-in and custom plugins:
+
+```python
+from noweda.plugins.schema import SchemaPlugin
+from noweda.plugins.missing import MissingDataPlugin
+
+engine = AutoEDAEngine([
+    SchemaPlugin(),
+    MissingDataPlugin(),
+    CustomQualityPlugin(),  # Your custom plugin
+])
+report = engine.run_df(df)
 ```
 
 ---
@@ -531,7 +998,7 @@ python -m pytest tests/ -v
 ```
 NowEDA/
 ├── noweda/
-│   ├── __init__.py               # exposes noweda.read()
+│   ├── __init__.py               # exposes noweda.read() and noweda.read_chunked()
 │   ├── io.py                     # file ingestion (all formats)
 │   ├── accessor.py               # df.eda.* pandas accessor (5 methods)
 │   ├── ml_utils.py               # ML utility functions (VIF, cardinality, etc.)
@@ -576,12 +1043,11 @@ NowEDA/
 - [x] Dataset comparison (drift detection)
 - [x] Column-level quality summaries
 - [x] Code snippets in preprocessing pipeline
+- [x] Additional PII patterns (phone, SSN, credit card with Luhn validation)
+- [x] Streaming / chunked ingestion for large files (`read_chunked()`)
 
 **Coming Soon:**
-- [ ] Additional PII patterns (phone, SSN, credit card)
-- [ ] Streaming / chunked ingestion for large files
 - [ ] PyPI publish
-- [ ] Web dashboard UI (we don't need this so lets not include it)
 - [ ] Feature interaction detection
 - [ ] Correlation explanation for numeric features
 

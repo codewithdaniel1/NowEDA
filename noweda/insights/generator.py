@@ -110,12 +110,30 @@ class InsightGenerator:
                     )
 
     def _pii_insights(self, pii, insights):
-        for col, info in pii.items():
-            count = info.get("emails_detected", 0)
-            insights.append(
-                f"PII detected in column '{col}': {count} email address(es) found. "
-                "Mask or remove before sharing."
-            )
+        for col, pii_types in pii.items():
+            # pii_types is a dict like {"email": 42, "phone": 7, "ssn": 1}
+            if not pii_types:
+                continue
+
+            # Build human-readable summary of PII types found
+            pii_summary = []
+            type_names = {
+                "email": "email address",
+                "phone": "phone number",
+                "ssn": "Social Security Number",
+                "credit_card": "credit card number"
+            }
+
+            for pii_type, count in sorted(pii_types.items()):
+                if count > 0:
+                    display_name = type_names.get(pii_type, pii_type)
+                    pii_summary.append(f"{count} {display_name}(s)")
+
+            if pii_summary:
+                insights.append(
+                    f"PII detected in column '{col}': {', '.join(pii_summary)}. "
+                    "Mask or remove before sharing."
+                )
 
     def _encoding_insights(self, encoding, insights):
         for col, enc_type in encoding.items():

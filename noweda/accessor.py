@@ -277,29 +277,38 @@ class NowEDAAccessor:
 
         NowEDA scans for common PII patterns including:
             - Email addresses
-            - Phone numbers (extensible)
-            - Social Security Numbers (extensible)
-            - Credit card numbers (extensible)
+            - Phone numbers
+            - Social Security Numbers (SSNs)
+            - Credit card numbers
 
         Returns:
-            DataFrame with columns: [Column, PII_Type]
+            DataFrame with columns: [Column, PII_Type, Count]
                 - Column: Column name containing PII
-                - PII_Type: Type of PII detected (e.g., 'email', 'phone', 'ssn')
+                - PII_Type: Type of PII detected ('email', 'phone', 'ssn', 'credit_card')
+                - Count: Number of values matching this PII pattern
 
             Returns empty DataFrame if no PII detected.
 
         Example:
             pii = df.eda.pii_df()
             print(pii)
-            #        Column PII_Type
-            # 0  customer_email    email
-            # 1  user_phone     phone
+            #        Column     PII_Type  Count
+            # 0  customer_email       email    42
+            # 1  customer_phone       phone    38
+            # 2  ssn_column           ssn     50
         """
         self._ensure_analyzed()
         pii = self._report["results"].get("pii", {})
         if not pii:
-            return pd.DataFrame({"Column": [], "PII_Type": []})
-        return pd.DataFrame(list(pii.items()), columns=["Column", "PII_Type"])
+            return pd.DataFrame({"Column": [], "PII_Type": [], "Count": []})
+
+        # Flatten the nested structure: for each column, expand findings dict into rows
+        rows = []
+        for col, findings in pii.items():
+            for pii_type, count in findings.items():
+                rows.append({"Column": col, "PII_Type": pii_type, "Count": count})
+
+        return pd.DataFrame(rows)
 
     def encoding_df(self):
         """Return detected encoding signals in data columns as a DataFrame.
@@ -611,10 +620,21 @@ class NowEDAAccessor:
 
         print(f"\n{_CYAN}{'='*70}{_RESET}\n")
 
-    def vizall(self):
+    def vizall(self, sample=None):
         """Auto-render the best visualizations for each column type.
 
-        Produces:
+        Parameters
+        ----------
+        sample : int or None, default None
+            Number of rows to sample for visualization. Useful for large datasets (>50k rows).
+            - If None: auto-sample if df has > 50,000 rows (uses 10,000 rows)
+            - If int: use exactly that many rows for viz (analysis still uses full data)
+            - If False: disable sampling, use full dataset (may be slow on huge files)
+
+            Note: Sampling is only for visualization. All statistical analysis uses the full dataset.
+
+        Produces
+        --------
           - Histogram + KDE for every numeric column
           - Bar chart of top categories for every categorical column
           - Correlation heatmap when ≥2 numeric columns exist
@@ -631,27 +651,83 @@ class NowEDAAccessor:
             )
 
         self._ensure_analyzed()
-        df = self._df
+        df_full = self._df
+
+        # Auto-sample large datasets for faster visualization
+        if sample is None:
+            # Auto-decide: if > 50k rows, sample 10k for viz
+            if len(df_full) > 50_000:
+                sample = min(10_000, len(df_full))
+            else:
+                sample = False
+
+        # Apply sampling only for viz (not for analysis)
+        if sample is False:
+            df = df_full
+        else:
+            # Sample with stratification for categorical columns
+            df = df_full.sample(n=min(sample, len(df_full)), random_state=42)
         results = self._report["results"]
         schema = results.get("schema", {})
         missing_info = results.get("missing", {})
 
+        # Helper: exclude ID and quasi-ID columns (not useful for visualization)
+        def is_id_column(col_name, col_values):
+            """Detect ID columns by name. Only exclude if column name suggests it's an identifier."""
+            # Check column name for ID indicators
+            col_lower = col_name.lower()
+            is_id_like = (
+                col_lower in ("id", "customer_id", "user_id", "record_id", "index", "idx") or
+                col_lower.endswith("_id") or
+                col_lower.startswith("id_")
+            )
+
+            # For object/string columns, also check if it's sequential IDs (like "CUST001", "USER_123")
+            if is_id_like:
+                return True
+
+            # High cardinality check: only for object columns (credit card, email, etc)
+            # Don't apply to numeric columns as continuous data naturally has high cardinality
+            if col_values.dtype == object:
+                unique_ratio = col_values.nunique() / len(col_values) if len(col_values) > 0 else 0
+                if unique_ratio > 0.95:  # >95% unique string values likely PII/ID
+                    return True
+
+            return False
+
+        # Exclude ID columns from visualization
+        viz_cols = [c for c in df.columns if not is_id_column(c, df[c])]
+
+        # Helper: detect if a numeric column is actually PII (credit cards, etc.)
+        def is_numeric_pii(col_name, col_values):
+            """Detect numeric PII: credit_card, account_number, etc."""
+            col_lower = col_name.lower()
+            pii_indicators = (
+                "credit" in col_lower or
+                "card" in col_lower or
+                "account_number" in col_lower or
+                "ssn" in col_lower or
+                "zip" in col_lower
+            )
+            return pii_indicators
+
         numeric_cols = [
-            c for c in df.columns
+            c for c in viz_cols
             if df[c].dtype.kind in ("i", "u", "f")
+            and not is_numeric_pii(c, df[c])  # Exclude numeric PII
         ]
         cat_cols = [
-            c for c in df.columns
+            c for c in viz_cols
             if (df[c].dtype == object or str(df[c].dtype) == "category")
             and schema.get(c, {}).get("role") in ("categorical", "categorical_numeric", "text", None)
             and df[c].nunique() <= 30
         ]
         datetime_cols = [
-            c for c in df.columns
+            c for c in viz_cols
             if df[c].dtype.kind == "M" or schema.get(c, {}).get("role") == "datetime"
         ]
         cols_with_missing = [
-            c for c in df.columns
+            c for c in viz_cols
             if df[c].isna().sum() > 0
         ]
 
