@@ -48,22 +48,22 @@ Prints a rich, colour-coded report with comprehensive data profiling:
 
 Provides expert guidance on which algorithms to try first, with data-specific reasoning:
 
-** Supervised Learning (Classification & Regression)**
+#### Supervised Learning (Classification & Regression)
 - **Supervised algorithms** — Linear/Logistic Regression, Random Forest, Gradient Boosting (XGBoost), SVM, KNN, Neural Networks, Naive Bayes
 - **Rating system** — ***** (1–5 stars) based on your data characteristics
 - **Reasoning** — ✓ Why it fits + ✗ When to avoid + ⚠ Before fitting warnings
 - **Class imbalance detection** — Alerts if target variable is imbalanced with actionable solutions (SMOTE, stratified split, class weights)
 
-** Unsupervised Learning (Clustering & Dimensionality Reduction)**
+#### Unsupervised Learning (Clustering & Dimensionality Reduction)
 - **Clustering** — K-Means, DBSCAN, Hierarchical Clustering with data-specific ratings
 - **Reduction** — PCA, t-SNE/UMAP with dimensionality guidance
 - **Anomaly Detection** — Isolation Forest for outlier scoring
 
-** Multicollinearity Guidance**
+#### Multicollinearity Guidance
 - Detects high correlations (|r| > 0.85) and explains the problem
 - Provides three solutions: (1) Drop correlated features, (2) Use PCA, (3) Use Ridge/Lasso
 
-** Data Preprocessing Pipeline**
+#### Data Preprocessing Pipeline
 - Step-by-step instructions tailored to your dataset
 - Code snippets for imputation, encoding, scaling, and handling outliers
 - Handles special cases: high missingness, skewness, outliers, multicollinearity
