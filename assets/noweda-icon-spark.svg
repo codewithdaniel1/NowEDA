@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title desc">
+  <title id="title">NowEDA logo concept 3</title>
+  <desc id="desc">A framed analytics sparkline with brand-colored nodes.</desc>
+  <rect x="14" y="14" width="164" height="164" rx="34" fill="#14064f"/>
+  <rect x="28" y="28" width="136" height="136" rx="24" fill="none" stroke="#3d2aa7" stroke-width="4"/>
+  <path d="M42 124L70 108L92 120L118 78L150 96" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="42" cy="124" r="7" fill="#ffc928"/>
+  <circle cx="70" cy="108" r="7" fill="#ff1493"/>
+  <circle cx="92" cy="120" r="7" fill="#ffc928"/>
+  <circle cx="118" cy="78" r="7" fill="#ff1493"/>
+  <circle cx="150" cy="96" r="7" fill="#ffc928"/>
+</svg>

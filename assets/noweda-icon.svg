@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">NowEDA logo</title>
+  <desc id="desc">A rounded-square logo with a heartbeat-style N line and colored nodes.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8f7ff"/>
+      <stop offset="100%" stop-color="#f4f1ff"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="14" y="14" width="484" height="484" rx="112" fill="#1b0b73"/>
+  <rect x="28" y="28" width="456" height="456" rx="96" fill="url(#bg)"/>
+
+  <path d="M34 320H140V214L248 366L352 190H478" fill="none" stroke="#1b0b73" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <circle cx="140" cy="320" r="34" fill="#ffc928"/>
+  <circle cx="352" cy="190" r="34" fill="#ff1493"/>
+</svg>

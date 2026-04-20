@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title desc">
+  <title id="title">NowEDA logo concept 4</title>
+  <desc id="desc">A pulse line inside a rounded frame with two accent dots.</desc>
+  <rect x="14" y="14" width="164" height="164" rx="38" fill="#f8f7ff"/>
+  <rect x="26" y="26" width="140" height="140" rx="28" fill="none" stroke="#1b0b73" stroke-width="8"/>
+  <path d="M40 108H66L78 78L92 126L110 90L124 108H152" fill="none" stroke="#1b0b73" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="78" cy="78" r="7" fill="#ffc928"/>
+  <circle cx="124" cy="108" r="7" fill="#ff1493"/>
+</svg>

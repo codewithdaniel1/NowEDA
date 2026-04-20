@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title desc">
+  <title id="title">NowEDA logo concept 6</title>
+  <desc id="desc">A hexagon badge with an abstract N and data nodes.</desc>
+  <polygon points="96,16 158,52 158,140 96,176 34,140 34,52" fill="#1b0b73"/>
+  <path d="M64 130V62h14l32 40V62h18v68h-14l-32-40v40z" fill="#ffffff"/>
+  <circle cx="54" cy="58" r="7" fill="#ffc928"/>
+  <circle cx="138" cy="58" r="7" fill="#ff1493"/>
+  <circle cx="54" cy="134" r="7" fill="#ff1493"/>
+  <circle cx="138" cy="134" r="7" fill="#ffc928"/>
+</svg>

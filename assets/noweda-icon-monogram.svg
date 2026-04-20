@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title desc">
+  <title id="title">NowEDA logo concept 2</title>
+  <desc id="desc">A bold circular monogram with an N and small data accents.</desc>
+  <circle cx="96" cy="96" r="86" fill="#1b0b73"/>
+  <path d="M62 134V58h18l32 43V58h18v76h-18l-32-43v43z" fill="#ffffff"/>
+  <circle cx="52" cy="52" r="8" fill="#ffc928"/>
+  <circle cx="140" cy="52" r="8" fill="#ff1493"/>
+  <circle cx="52" cy="140" r="8" fill="#ff1493"/>
+  <circle cx="140" cy="140" r="8" fill="#ffc928"/>
+</svg>
