@@ -1,15 +1,17 @@
-<h1 align="center"><img src="assets/noweda-wordmark-inline.svg" alt="NowEDA logo" width="320" /></h1>
+<div align="left">
+  <img src="assets/noweda-wordmark-logo.svg" alt="NowEDA logo" width="700" />
+  <div style="margin-top: 0px;">
+    <a href="https://pypi.org/project/noweda/">
+      <img alt="PyPI version" src="https://img.shields.io/pypi/v/noweda" />
+    </a>
+    <a href="https://pypi.org/project/noweda/">
+      <img alt="Version release date" src="https://img.shields.io/badge/version%20release%20date-2026--04--20-1b0b73" />
+    </a>
+  </div>
+</div>
 
-<p align="center">
-  <a href="https://pypi.org/project/noweda/">
-    <img alt="PyPI version" src="https://img.shields.io/pypi/v/noweda" />
-  </a>
-  <a href="https://pypi.org/project/noweda/">
-    <img alt="Version release date" src="https://img.shields.io/badge/version%20release%20date-2026--04--20-1b0b73" />
-  </a>
-</p>
 
-<p align="center"><strong>Automated Exploratory Data Analysis — built as a native pandas extension with Spark acceleration built in.</strong></p>
+### Automated Exploratory Data Analysis — built as a native pandas extension with Spark acceleration built in.
 
 NowEDA is a lightweight, modular Python framework that turns any dataset into instant insight. Load any file, call `df.noweda.*`, and get a full EDA report — including data quality scoring, PII detection, outlier analysis, and human-readable insights — with zero boilerplate.
 

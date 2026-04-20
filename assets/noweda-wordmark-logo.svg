@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 312" role="img" aria-labelledby="title desc">
+  <title id="title">NowEDA wordmark with logo</title>
+  <desc id="desc">A transparent NowEDA wordmark that uses the monogram logo in place of the initial N.</desc>
+
+  <g transform="translate(18 18)">
+    <circle cx="88" cy="88" r="86" fill="#1b0b73"/>
+    <path d="M54 126V50h18l32 43V50h18v76h-18l-32-43v43z" fill="#ffffff"/>
+    <circle cx="44" cy="44" r="8" fill="#ffc928"/>
+    <circle cx="132" cy="44" r="8" fill="#ff1493"/>
+    <circle cx="44" cy="132" r="8" fill="#ff1493"/>
+    <circle cx="132" cy="132" r="8" fill="#ffc928"/>
+  </g>
+
+  <text
+    x="194"
+    y="152"
+    fill="#24108a"
+    font-family="Inter, Avenir Next, Avenir, system-ui, sans-serif"
+    font-size="118"
+    font-weight="800"
+    letter-spacing="-4">owEDA</text>
+
+  <rect x="194" y="172" width="122" height="16" rx="8" fill="#ffc928"/>
+  <circle cx="340" cy="180" r="7.5" fill="#ff1493"/>
+</svg>

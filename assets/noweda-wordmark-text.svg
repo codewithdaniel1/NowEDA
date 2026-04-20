@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 784 312" role="img" aria-labelledby="title desc">
+  <title id="title">NowEDA text wordmark</title>
+  <desc id="desc">A bold NowEDA wordmark with a yellow bar and pink dot accent, without an icon.</desc>
+
+  <text
+    x="38"
+    y="152"
+    fill="#24108a"
+    font-family="Inter, Avenir Next, Avenir, system-ui, sans-serif"
+    font-size="118"
+    font-weight="800"
+    letter-spacing="-4">NowEDA</text>
+
+  <rect x="38" y="184" width="122" height="16" rx="8" fill="#ffc928"/>
+  <circle cx="184" cy="192" r="7.5" fill="#ff1493"/>
+</svg>
