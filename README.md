@@ -1,4 +1,4 @@
-# [NowEDA](https://pypi.org/project/noweda/)
+# NowEDA
 
 **Automated Exploratory Data Analysis — built as a native pandas extension with Spark acceleration built in.**
 
