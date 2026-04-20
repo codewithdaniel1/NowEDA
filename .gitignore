@@ -11,6 +11,9 @@ build/
 *.whl
 *.tar.gz
 
+# Local publishing credentials
+.pypirc
+
 # Python cache
 __pycache__/
 *.py[cod]

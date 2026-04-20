@@ -1057,9 +1057,9 @@ NowEDA/
 - [x] Code snippets in preprocessing pipeline
 - [x] Additional PII patterns (phone, SSN, credit card with Luhn validation)
 - [x] Streaming / chunked ingestion for large files (`read_chunked()`)
+- [x] PyPI publish automation with version-based release gating
 
 **Coming Soon:**
-- [ ] PyPI publish
 - [ ] Feature interaction detection
 - [ ] Correlation explanation for numeric features
 

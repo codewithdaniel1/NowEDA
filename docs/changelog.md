@@ -11,6 +11,7 @@ All notable changes to NowEDA are documented here.
 - Spark-backed loading is now part of the standard install, with automatic routing for large supported files
 - `read_chunked()` now uses Spark automatically for large CSV/JSON files when appropriate
 - Notebook, CLI, and accessor methods show a loading indicator while analysis is running
+- GitHub Actions now publishes to PyPI automatically when the package version in `pyproject.toml` is new
 
 ---
 
@@ -75,6 +76,5 @@ Features planned for future releases:
 - Visualisation layer (histograms, correlation heatmap, distribution plots)
 - Additional PII patterns (phone numbers, SSNs, credit card numbers)
 - Dataset fingerprinting (hash-based change detection)
-- PyPI publish
 - conda-forge package
 - Web dashboard UI

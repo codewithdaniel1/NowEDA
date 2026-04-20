@@ -1,0 +1,86 @@
+name: Publish Package to PyPI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Read package version
+        id: version
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import os
+
+          text = Path("pyproject.toml").read_text()
+          match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+          if not match:
+              raise SystemExit("Could not find version in pyproject.toml")
+
+          version = match.group(1)
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              print(f"version={version}", file=handle)
+          PY
+
+      - name: Check whether this version is already on PyPI
+        id: pypi
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          package_name = "noweda"
+          version = "${{ steps.version.outputs.version }}"
+          published = False
+
+          try:
+              with urllib.request.urlopen(f"https://pypi.org/pypi/{package_name}/json", timeout=20) as response:
+                  data = json.load(response)
+              published = version in data.get("releases", {})
+          except urllib.error.HTTPError as exc:
+              if exc.code != 404:
+                  raise
+          except Exception as exc:
+              print(f"Warning: could not query PyPI ({exc}); proceeding with publish.")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              print(f"published={'true' if published else 'false'}", file=handle)
+          PY
+
+      - name: Skip publish
+        if: steps.pypi.outputs.published == 'true'
+        run: echo "Version ${{ steps.version.outputs.version }} is already on PyPI, so publishing is skipped."
+
+      - name: Install build tools
+        if: steps.pypi.outputs.published != 'true'
+        run: python -m pip install --upgrade build twine
+
+      - name: Build distribution
+        if: steps.pypi.outputs.published != 'true'
+        run: python -m build
+
+      - name: Publish to PyPI
+        if: steps.pypi.outputs.published != 'true'
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: python -m twine upload dist/*
