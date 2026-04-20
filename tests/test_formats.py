@@ -14,6 +14,7 @@ import pandas as pd
 import pytest
 
 import noweda
+import noweda.io as io_mod
 from noweda.io import read
 
 # ---------------------------------------------------------------------------
@@ -229,6 +230,96 @@ class TestErrorHandling:
         msg = str(exc_info.value)
         assert ".csv" in msg
         assert ".parquet" in msg
+
+    def test_backend_kwarg_is_no_longer_supported(self, tmp_path):
+        p = tmp_path / "data.csv"
+        _sample_df().to_csv(p, index=False)
+        with pytest.raises(TypeError):
+            read(str(p), backend="gpu")
+
+    def test_auto_spark_uses_spark_for_large_supported_files(self, tmp_path, monkeypatch):
+        p = tmp_path / "data.csv"
+        _sample_df().to_csv(p, index=False)
+
+        calls = {}
+
+        def fake_spark_loader(path, ext, **kwargs):
+            calls["called"] = True
+            calls["path"] = path
+            calls["ext"] = ext
+            calls["kwargs"] = kwargs
+            return _sample_df()
+
+        monkeypatch.setattr(io_mod, "_load_with_spark", fake_spark_loader)
+        monkeypatch.setattr(io_mod.os.path, "getsize", lambda _: 512 * 1024 * 1024)
+        monkeypatch.setattr(io_mod, "_SPARK_AUTO_THRESHOLD_MB", 1)
+
+        df = read(str(p))
+
+        assert calls["called"] is True
+        assert calls["ext"] == ".csv"
+        assert len(df) == 5
+
+    def test_auto_spark_falls_back_when_spark_missing(self, tmp_path, monkeypatch):
+        p = tmp_path / "data.csv"
+        _sample_df().to_csv(p, index=False)
+
+        def missing_spark_loader(*args, **kwargs):
+            raise ImportError("No module named 'pyspark'")
+
+        monkeypatch.setattr(io_mod, "_load_with_spark", missing_spark_loader)
+        monkeypatch.setattr(io_mod.os.path, "getsize", lambda _: 512 * 1024 * 1024)
+        monkeypatch.setattr(io_mod, "_SPARK_AUTO_THRESHOLD_MB", 1)
+
+        df = read(str(p))
+
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) == 5
+
+    def test_chunked_auto_spark_uses_spark_for_large_supported_files(self, tmp_path, monkeypatch):
+        p = tmp_path / "data.csv"
+        _sample_df().to_csv(p, index=False)
+
+        calls = {}
+
+        def fake_chunked_loader(path, ext, chunksize, concat, **kwargs):
+            calls["called"] = True
+            calls["path"] = path
+            calls["ext"] = ext
+            calls["chunksize"] = chunksize
+            calls["concat"] = concat
+            calls["kwargs"] = kwargs
+            if concat:
+                return _sample_df()
+            return iter([_sample_df()])
+
+        monkeypatch.setattr(io_mod, "_load_chunked_with_spark", fake_chunked_loader)
+        monkeypatch.setattr(io_mod.os.path, "getsize", lambda _: 512 * 1024 * 1024)
+        monkeypatch.setattr(io_mod, "_SPARK_AUTO_THRESHOLD_MB", 1)
+
+        df = io_mod.read_chunked(str(p), chunksize=2)
+
+        assert calls["called"] is True
+        assert calls["ext"] == ".csv"
+        assert calls["chunksize"] == 2
+        assert calls["concat"] is True
+        assert len(df) == 5
+
+    def test_chunked_auto_spark_falls_back_when_spark_missing(self, tmp_path, monkeypatch):
+        p = tmp_path / "data.csv"
+        _sample_df().to_csv(p, index=False)
+
+        def missing_spark_loader(*args, **kwargs):
+            raise ImportError("No module named 'pyspark'")
+
+        monkeypatch.setattr(io_mod, "_load_chunked_with_spark", missing_spark_loader)
+        monkeypatch.setattr(io_mod.os.path, "getsize", lambda _: 512 * 1024 * 1024)
+        monkeypatch.setattr(io_mod, "_SPARK_AUTO_THRESHOLD_MB", 1)
+
+        chunks = list(io_mod.read_chunked(str(p), chunksize=2, concat=False))
+
+        assert len(chunks) == 3
+        assert all(isinstance(chunk, pd.DataFrame) for chunk in chunks)
 
 
 # ===========================================================================

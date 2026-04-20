@@ -1,4 +1,5 @@
 import pandas as pd
+from functools import wraps
 from noweda.core.engine import AutoEDAEngine
 from noweda.plugins import default_plugins
 from noweda.ml_utils import (
@@ -10,6 +11,7 @@ from noweda.ml_recommendations import (
     _profile, supervised_recommendations, unsupervised_recommendations,
     preprocessing_pipeline, format_recommendations
 )
+from noweda.ui import loading
 
 @pd.api.extensions.register_dataframe_accessor("noweda")
 @pd.api.extensions.register_dataframe_accessor("eda")
@@ -1334,3 +1336,66 @@ class NowEDAAccessor:
                 print(f"  {_GREEN}PII removed from:{_RESET} {', '.join(sorted(removed_pii))}")
 
         print(f"\n{_CYAN}{'='*70}{_RESET}\n")
+
+
+def _loading_message(method_name, args, kwargs):
+    if method_name == "profile_column":
+        column_name = args[0] if args else kwargs.get("column_name", "column")
+        return f"NowEDA · Profiling column '{column_name}'"
+
+    messages = {
+        "insights": "NowEDA · Building insights",
+        "score": "NowEDA · Calculating scores",
+        "report": "NowEDA · Building report",
+        "scores_df": "NowEDA · Building scores table",
+        "insights_df": "NowEDA · Building insights table",
+        "schema_df": "NowEDA · Building schema table",
+        "stats_df": "NowEDA · Building statistics table",
+        "missing_df": "NowEDA · Building missing-data table",
+        "duplicates_df": "NowEDA · Building duplicate summary",
+        "correlation_df": "NowEDA · Building correlation matrix",
+        "outliers_df": "NowEDA · Building outlier table",
+        "pii_df": "NowEDA · Detecting PII",
+        "encoding_df": "NowEDA · Detecting encoding signals",
+        "statsall": "NowEDA · Building full statistical report",
+        "vizall": "NowEDA · Rendering visualizations",
+        "mlall": "NowEDA · Building ML recommendations",
+        "compare": "NowEDA · Comparing datasets",
+    }
+    return messages.get(method_name, f"NowEDA · Running {method_name}")
+
+
+def _wrap_with_loading(fn, method_name):
+    @wraps(fn)
+    def wrapped(self, *args, **kwargs):
+        with loading(_loading_message(method_name, args, kwargs)):
+            return fn(self, *args, **kwargs)
+
+    return wrapped
+
+
+for _method_name in (
+    "insights",
+    "score",
+    "report",
+    "scores_df",
+    "insights_df",
+    "schema_df",
+    "stats_df",
+    "missing_df",
+    "duplicates_df",
+    "correlation_df",
+    "outliers_df",
+    "pii_df",
+    "encoding_df",
+    "statsall",
+    "vizall",
+    "mlall",
+    "profile_column",
+    "compare",
+):
+    setattr(
+        NowEDAAccessor,
+        _method_name,
+        _wrap_with_loading(getattr(NowEDAAccessor, _method_name), _method_name),
+    )

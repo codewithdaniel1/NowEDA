@@ -1,6 +1,6 @@
 [project]
 name = "noweda"
-version = "0.1.1"
+version = "0.1.2"
 description = "Automated EDA with insights, scoring, and security-aware detection — built as a native pandas extension."
 readme = { file = "README.md", content-type = "text/markdown" }
 license = "MIT"
@@ -23,6 +23,7 @@ classifiers = [
 dependencies = [
     "pandas>=1.3",
     "numpy>=1.21",
+    "pyspark>=3.4",
     "openpyxl>=3.0",       # Excel (.xlsx, .ods, etc.)
     "lxml>=4.6",           # XML + HTML parsing
 ]

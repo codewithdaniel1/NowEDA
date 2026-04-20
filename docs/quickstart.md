@@ -32,6 +32,8 @@ df = eda.read("data.xlsx", sheet_name="Sales Q1")
 df = eda.read("data.csv", nrows=1000, encoding="latin-1")
 ```
 
+For very large Spark-friendly files, `eda.read()` can switch to PySpark automatically. Spark is bundled with NowEDA, so there is no extra install flag or backend setting.
+
 The returned object is a **standard pandas DataFrame** — every pandas method still works:
 
 ```python

@@ -11,6 +11,7 @@ NowEDA's core dependencies are installed automatically:
 |---|---|---|
 | `pandas` | ≥ 1.3 | DataFrame engine |
 | `numpy` | ≥ 1.21 | Numeric computation |
+| `pyspark` | ≥ 3.4 | Spark-backed ingestion for large files |
 | `openpyxl` | ≥ 3.0 | Excel (.xlsx) reading |
 | `lxml` | ≥ 4.6 | XML and HTML parsing |
 
@@ -23,7 +24,7 @@ pip install noweda
 ```
 
 This gives you full support for:
-CSV, TSV, Excel, JSON, XML, HTML, Stata, SAS, and Pickle formats.
+CSV, TSV, Excel, JSON, XML, HTML, Stata, SAS, Pickle, and Spark-backed large-file loading.
 
 ---
 

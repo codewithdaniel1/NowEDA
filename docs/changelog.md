@@ -4,6 +4,16 @@ All notable changes to NowEDA are documented here.
 
 ---
 
+## [0.1.2] — 2026-04-20
+
+### Changed
+
+- Spark-backed loading is now part of the standard install, with automatic routing for large supported files
+- `read_chunked()` now uses Spark automatically for large CSV/JSON files when appropriate
+- Notebook, CLI, and accessor methods show a loading indicator while analysis is running
+
+---
+
 ## [0.1.0] — 2026-04-16
 
 ### Added
@@ -65,7 +75,6 @@ Features planned for future releases:
 - Visualisation layer (histograms, correlation heatmap, distribution plots)
 - Additional PII patterns (phone numbers, SSNs, credit card numbers)
 - Dataset fingerprinting (hash-based change detection)
-- Streaming / chunked ingestion for very large files
 - PyPI publish
 - conda-forge package
 - Web dashboard UI

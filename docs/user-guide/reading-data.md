@@ -14,6 +14,10 @@ df = eda.read("path/to/file.csv")
 
 All `**kwargs` are forwarded directly to the underlying pandas reader, so every option you know from `pd.read_csv`, `pd.read_excel`, etc. works exactly the same way.
 
+For large Spark-friendly files, `eda.read()` can route through PySpark automatically when the file is big enough. Spark ships with NowEDA, so no extra flag or install step is needed.
+
+`eda.read_chunked()` follows the same idea for chunked CSV and JSON files: Spark is used automatically when it can help, and pandas chunks are still returned to your code.
+
 ---
 
 ## Supported Formats

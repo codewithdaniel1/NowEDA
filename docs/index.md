@@ -1,8 +1,8 @@
 # NowEDA
 
-**Automated Exploratory Data Analysis — built as a native pandas extension.**
+**Automated Exploratory Data Analysis — built as a native pandas extension with Spark acceleration built in.**
 
-NowEDA is a lightweight, modular Python framework that turns any dataset into instant insight. Load any file format, call `df.noweda.*`, and get a complete EDA report — data quality scoring, PII detection, outlier analysis, correlation mapping, and human-readable insights — with zero boilerplate.
+NowEDA is a lightweight, modular Python framework that turns any dataset into instant insight. Load any file format, call `df.noweda.*`, and get a complete EDA report — data quality scoring, PII detection, outlier analysis, correlation mapping, and human-readable insights — with zero boilerplate. Large supported files are automatically accelerated with Spark, and notebook/CLI runs show a loading indicator while work is in progress.
 
 ---
 
@@ -106,6 +106,8 @@ NowEDA reads **28 file extensions** across all major tabular data formats:
 ```bash
 pip install noweda
 ```
+
+Spark acceleration is included in the standard install.
 
 For additional format support:
 

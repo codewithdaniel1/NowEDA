@@ -12,6 +12,8 @@ noweda <file>
 
 Reads the file, runs all plugins, and prints a rich report to the terminal — including row/column counts, dtypes, descriptive statistics, and actionable insights.
 
+While the file is loading and the report is being built, the CLI shows a small live status indicator so it is clear what NowEDA is doing.
+
 ---
 
 ## Commands and Options

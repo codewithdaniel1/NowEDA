@@ -84,6 +84,12 @@ df = eda.read("data.txt", sep="\t")
 
 ---
 
+**Q: How does NowEDA handle very large files?**
+
+`eda.read()` automatically uses Spark for large supported files, and `eda.read_chunked()` can also use Spark when chunked loading makes sense. You still get pandas DataFrames back, but the load step is faster and the UI shows progress while the work is running.
+
+---
+
 **Q: I have a multi-sheet Excel file. How do I load a specific sheet?**
 
 ```python

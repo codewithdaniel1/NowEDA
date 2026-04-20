@@ -1,6 +1,6 @@
 # NowEDA
 
-**Automated Exploratory Data Analysis — built as a native pandas extension.**
+**Automated Exploratory Data Analysis — built as a native pandas extension with Spark acceleration built in.**
 
 NowEDA is a lightweight, modular Python framework that turns any dataset into instant insight. Load any file, call `df.noweda.*`, and get a full EDA report — including data quality scoring, PII detection, outlier analysis, and human-readable insights — with zero boilerplate.
 
@@ -462,7 +462,7 @@ encoding = df.eda.encoding_df()      # Returns DataFrame with encoding signals
 
 ### All Supported Formats
 
-NowEDA supports 28 file formats through pandas:
+NowEDA supports 28 file formats through pandas, with Spark acceleration built in for large CSV, TSV, TXT, Parquet, and ORC files:
 
 ```python
 import noweda as eda
@@ -485,9 +485,21 @@ df = eda.read("data.xlsx", sheet_name="Sheet1")
 df = eda.read("data.json", orient="records")
 ```
 
+For very large Spark-friendly files, Spark-backed loading happens automatically:
+
+```python
+df = eda.read("big.csv")      # Uses Spark automatically for large supported files
+df = eda.read("big.parquet")  # Also handled automatically
+```
+
+Spark ships with NowEDA, so no extra install flag is needed.
+
+When a method is running, NowEDA shows a traditional percentage progress line in notebooks and the CLI so the user can see what is happening.
+
 ### Chunked Ingestion for Large Files
 
 For files larger than available RAM, use `read_chunked()` to process data in chunks. This is essential for datasets that would otherwise exhaust system memory.
+When a chunked file is Spark-friendly and large enough, NowEDA will use Spark automatically before yielding pandas chunks.
 
 #### Mode 1: Concatenate All Chunks (Simpler)
 

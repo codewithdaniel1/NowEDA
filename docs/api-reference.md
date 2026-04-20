@@ -36,6 +36,8 @@ df = eda.read("data.xlsx", sheet_name="Q1")
 df = eda.read("data.csv", nrows=500, encoding="latin-1")
 ```
 
+Large Spark-friendly files are routed through Spark automatically when possible, and the notebook/CLI UI shows a loading indicator while work is in progress.
+
 ---
 
 ## `NowEDAAccessor`
