@@ -4,147 +4,36 @@
 **Result key:** `pii`  
 **Import:** `from noweda.plugins.pii import PIIDetectorPlugin`
 
----
-
 ## What It Does
 
-The PII (Personally Identifiable Information) Detection plugin scans string columns for patterns that indicate sensitive personal data. Out of the box, it detects **email addresses**. The plugin is designed to be extended with additional patterns (phone numbers, SSNs, credit card numbers, etc.).
-
----
+Scans object, string and categorical columns for email addresses, US-style phone
+numbers, formatted US Social Security numbers and supported credit card patterns.
+Numeric and datetime columns are skipped; load identifiers as strings to preserve
+leading zeros and formatting.
 
 ## Output Format
 
 ```python
-{
-    "email": {
-        "email": 17    # count of matching values in this column
-    }
-}
+{"contact": {"credit_card": 1, "phone": 2}}
 ```
 
-Only columns with at least one match appear. Empty dict = no PII detected.
-
----
+Counts represent **cells containing at least one match of each type**. Two card
+numbers in one cell count once. Duplicate row index labels still count as separate
+observations. Columns without matches are omitted.
 
 ## How Detection Works
 
-The plugin scans each `object`-dtype column using a regular expression:
+Card candidates can contain spaces or hyphens. The digits must match supported
+Visa (13/16 digits), Mastercard (51–55 prefixes), American Express or Discover
+(6011/65 prefixes) patterns and pass the Luhn checksum. A checksum match does not
+verify that an account exists. Other issuers, newer ranges and 19-digit cards are
+not currently detected.
 
-```
-[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+
-```
-
-This matches standard email address formats. The count represents the number of **rows** (not characters) in the column that contain at least one email address.
-
----
-
-## Scoring Impact
-
-| PII columns found | Risk score increase |
-|---|---|
-| Per column | +15 |
-
-A dataset with 2 columns containing emails gets `risk += 30`.
-
----
-
-## Insight Generated
-
-```
-PII detected in column 'email': 17 email address(es) found. Mask or remove before sharing.
-```
-
----
-
-## How to Use the Results
-
-```python
-summary = df.noweda.summary()
-pii = summary["pii"]
-
-if pii:
-    print("WARNING: PII detected in the following columns:")
-    for col, info in pii.items():
-        print(f"  {col}: {info}")
-else:
-    print("No PII detected.")
-```
-
-### Masking PII before sharing
-
-Once NowEDA identifies PII columns, you can mask them:
-
-```python
-import hashlib
-
-pii_cols = list(df.noweda.summary()["pii"].keys())
-
-df_safe = df.copy()
-for col in pii_cols:
-    # Replace with SHA-256 hash (consistent but irreversible)
-    df_safe[col] = df_safe[col].apply(
-        lambda x: hashlib.sha256(str(x).encode()).hexdigest()[:12] if pd.notna(x) else x
-    )
-
-# Or simply redact
-for col in pii_cols:
-    df_safe[col] = "[REDACTED]"
-```
-
----
-
-## Extending the Plugin with Custom PII Patterns
-
-The plugin is designed to be subclassed. Here's how to add phone number detection:
-
-```python
-import re
-from noweda.plugins.pii import PIIDetectorPlugin
-
-class ExtendedPIIPlugin(PIIDetectorPlugin):
-    name = "pii"
-
-    PHONE_REGEX = r"\b(\+?1[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}\b"
-    SSN_REGEX   = r"\b\d{3}-\d{2}-\d{4}\b"
-
-    def run(self, df):
-        findings = super().run(df)   # get email results
-
-        for col in df.columns:
-            if df[col].dtype == "object":
-                # Phone detection
-                phones = df[col].astype(str).str.contains(
-                    self.PHONE_REGEX, regex=True
-                ).sum()
-                if phones > 0:
-                    findings.setdefault(col, {})["phones_detected"] = int(phones)
-
-                # SSN detection
-                ssns = df[col].astype(str).str.contains(
-                    self.SSN_REGEX, regex=True
-                ).sum()
-                if ssns > 0:
-                    findings.setdefault(col, {})["ssns_detected"] = int(ssns)
-
-        return findings
-```
-
-Use it:
-
-```python
-from noweda.core.engine import AutoEDAEngine
-from noweda.plugins import default_plugins
-
-# Replace the default PII plugin with your extended version
-plugins = [p for p in default_plugins() if p.name != "pii"]
-plugins.append(ExtendedPIIPlugin())
-
-engine = AutoEDAEngine(plugins)
-report = engine.run_df(df)
-print(report["results"]["pii"])
-```
-
----
+Card-shaped spans are excluded from phone matching, including candidates that
+fail the checksum. A separate phone elsewhere in the same cell is still checked.
+Phone patterns cover ten-digit US-style numbers, with an optional `+1`, separators
+and parentheses. SSN patterns require `NNN-NN-NNNN` or space-separated groups.
+These patterns do not validate whether a phone or SSN was issued.
 
 ## Using This Plugin Standalone
 
@@ -152,23 +41,23 @@ print(report["results"]["pii"])
 import pandas as pd
 from noweda.plugins.pii import PIIDetectorPlugin
 
-df = pd.DataFrame({
-    "email":   ["alice@example.com", "bob@company.org", "not-an-email"],
-    "comment": ["Hello world", "Contact me at charlie@test.com", "No email here"],
-    "number":  [1, 2, 3],
-})
-
-plugin = PIIDetectorPlugin()
-result = plugin.run(df)
-
-print(result)
-# {'email': {'email': 2}, 'comment': {'email': 1}}
+df = pd.DataFrame({"contact": [
+    "4111 1111 1111 1111",
+    "202-555-0101",
+    "202-555-0102",
+]}, index=[0, 0, 0])
+print(PIIDetectorPlugin().run(df))
+# {'contact': {'credit_card': 1, 'phone': 2}}
 ```
 
----
+## Scoring Impact
 
-## Important Notes
+Each column with any PII signal adds 15 risk points, regardless of how many types
+or cells match. `df.eda.pii_df()` returns `Column`, `PII_Type` and `Count`.
 
-- The plugin only scans `object`-dtype columns. Numeric or datetime columns are skipped.
-- Detection is pattern-based, not context-aware. False positives are possible (e.g., a product code that happens to match the email regex).
-- For production data governance, combine NowEDA's detection with a dedicated PII scanning tool.
+## Limitations
+
+These are pattern-based signals: false positives and missed sensitive values are
+possible. A zero risk score means no configured pattern matched, not that data is
+safe to share. Adjacent numeric identifiers without clear separators can be
+ambiguous. Review findings in context before using them for data governance.

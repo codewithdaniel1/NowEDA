@@ -9,7 +9,9 @@ def calculate_vif(df, numeric_cols=None):
     Calculate Variance Inflation Factor (VIF) for numeric columns.
     VIF > 5-10 indicates problematic multicollinearity.
 
-    Returns dict: {column: vif_value}
+    Uses complete, finite observations and an intercept in each regression.
+    Constant responses or no residual degrees of freedom return NaN.
+    Returns dict: {column: vif_value}; fewer than two columns returns {}.
     """
     if numeric_cols is None:
         numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
@@ -17,34 +19,37 @@ def calculate_vif(df, numeric_cols=None):
     if len(numeric_cols) < 2:
         return {}
 
-    try:
-        from statsmodels.stats.outliers_influence import variance_inflation_factor
-        vif_data = {}
-        # Drop NaN before calculation
-        df_clean = df[numeric_cols].dropna()
-        if len(df_clean) == 0:
-            return {}
-        for i, col in enumerate(numeric_cols):
-            try:
-                vif = variance_inflation_factor(df_clean.values, i)
-                vif_data[col] = vif if vif < 1e6 else float('inf')
-            except Exception:
-                vif_data[col] = np.nan
+    # Regress each feature on ALL other features. Centering includes an
+    # intercept, so results do not depend on offsets or optional dependencies.
+    values = df[numeric_cols].to_numpy(dtype=float, na_value=np.nan)
+    values = values[np.isfinite(values).all(axis=1)]
+    vif_data = dict.fromkeys(numeric_cols, float("nan"))
+    if len(values) < 2:
         return vif_data
-    except ImportError:
-        # Fallback: calculate VIF manually using correlation
-        vif_data = {}
-        corr_matrix = df[numeric_cols].corr().abs()
-        for col in numeric_cols:
-            # Simple approximation: 1 / (1 - max_correlation^2)
-            other_corr = corr_matrix[col].drop(col)
-            max_corr = other_corr.max() if len(other_corr) > 0 else 0
-            if max_corr < 1.0:
-                vif = 1 / (1 - max_corr**2) if max_corr < 0.99 else np.inf
-            else:
-                vif = np.inf
-            vif_data[col] = vif
-        return vif_data
+
+    # Scale before centering to avoid overflow with large finite values.
+    scales = np.max(np.abs(values), axis=0)
+    values = values / np.where(scales == 0, 1, scales)
+    values -= values.mean(axis=0)
+    norms = np.linalg.norm(values, axis=0)
+    variable = norms > 0
+    values /= np.where(variable, norms, 1)
+
+    for i, col in enumerate(numeric_cols):
+        if not variable[i]:
+            continue  # VIF is undefined for a constant response.
+        predictors = values[:, variable & (np.arange(len(numeric_cols)) != i)]
+        try:
+            coef, _, rank, _ = np.linalg.lstsq(predictors, values[:, i], rcond=None)
+            if len(values) <= rank + 1:
+                continue  # No residual degrees of freedom after the intercept.
+            residual = values[:, i] - predictors @ coef
+            residual_ss = float(residual @ residual)
+            tolerance = (np.finfo(float).eps * max(values.shape)) ** 2
+            vif_data[col] = float("inf") if residual_ss <= tolerance else max(1.0, 1 / residual_ss)
+        except np.linalg.LinAlgError:
+            pass
+    return vif_data
 
 
 def cramers_v(x, y):

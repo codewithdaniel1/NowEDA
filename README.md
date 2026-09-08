@@ -50,8 +50,9 @@ df.eda.statsall()
 ### 1. `df.eda.statsall()` — Statistical profile
 
 Prints scores, column roles, numeric and categorical statistics, missingness,
-outliers, and preprocessing suggestions. Optional `noweda[ml]` dependencies
-provide VIF and time-series diagnostics; unavailable diagnostics are omitted.
+outliers, and preprocessing suggestions. VIF uses multivariate regression
+in the standard install. Optional `noweda[ml]` dependencies add time-series
+diagnostics. Constant columns and insufficient observations yield unavailable VIF.
 
 ### 2. `df.eda.mlall()` — ML recommendations and preprocessing guidance
 
@@ -118,9 +119,19 @@ two DataFrames. This is not a formal statistical test for distribution drift.
 | `correlation_df()` | Numeric Pearson correlation matrix |
 | `outliers_df()` | IQR outlier counts; use `format="percentage"` for percentages |
 | `pii_df()` | `Column`, `PII_Type`, `Count` |
-| `encoding_df()` | `Column`, `Encoding_Type` (possible Base64 signals) |
+| `encoding_df()` | `Column`, `Encoding_Type`; `include_confidence=True` adds sample evidence |
 | `summary()` | Dictionary of raw plugin outputs |
-| `report()` | Dictionary containing `results`, `scores`, and `insights` |
+| `report()` | `results`, `scores`, `insights`, `score_breakdown`, and `encoding_details` |
+
+In 0.1.4, outlier penalties use the fraction of observed numeric values flagged
+by the IQR rule: above 1% deducts 5 points; above 5% deducts 10 from quality and
+readiness. `report()["score_breakdown"]` explains the score contributions.
+Base64 detection requires at least six matches and an 80% sample match rate,
+with extra evidence beyond simply being decodable. Its confidence field is the
+sample match fraction, not a probability that data is encoded or malicious.
+
+Column labels may be integers, strings, or tuples but must be unique. Empty
+DataFrames produce an explanatory message; their scores are not informative.
 
 Reports are cached. Each request fingerprints the DataFrame's values and schema,
 recomputing analysis when they change. This check scans the data; cached access is
@@ -145,7 +156,7 @@ df = eda.read("data.csv", dtype={"customer_id": str})
 | HDF5 | `pip install "noweda[hdf]"` |
 | SPSS | `pip install "noweda[spss]"` |
 | Charts and KDE overlays | `pip install "noweda[viz]"` |
-| VIF, stationarity and seasonality dependencies | `pip install "noweda[ml]"` |
+| Stationarity and seasonality dependencies | `pip install "noweda[ml]"` |
 | All optional analysis and format dependencies | `pip install "noweda[full]"` |
 
 Only read Pickle files from trusted sources, since loading them can execute code.
@@ -153,7 +164,7 @@ Only read Pickle files from trusted sources, since loading them can execute code
 ## Large files
 
 CSV, JSON, and all chunked reads use pandas consistently regardless of file size.
-PySpark remains a standard dependency in 0.1.3. Large Parquet/ORC files (at least
+PySpark remains a standard dependency in 0.1.4. Large Parquet/ORC files (at least
 128 MB) without reader options may use Spark, with a pandas fallback on failure.
 Spark requires a compatible Java installation. Reads with options use pandas.
 Spark loading still collects the final pandas DataFrame into local memory and
@@ -170,17 +181,37 @@ The default `concat=True` retains all chunks and allocates a combined DataFrame;
 it is appropriate only when the data and concatenation overhead fit in RAM.
 Per-chunk scores describe each chunk, not the whole dataset.
 
+If processing may stop early, wrap the generator in `contextlib.closing()`:
+
+```python
+from contextlib import closing
+
+with closing(eda.read_chunked("large.csv", concat=False)) as chunks:
+    for chunk in chunks:
+        print(chunk.eda.missing_df())
+        break  # Optional: the reader closes and the indicator reports stopped.
+```
+
+Running indicators show elapsed time; 100% appears only after completion.
+Closing a stream early displays "Stopped before completion".
+
 ## Export and CLI
 
 ```python
 from noweda.report.html import generate_html_report
+from noweda.report.json import generate_json_report
 
 generate_html_report(df.eda.report(), "report.html")
+generate_json_report(df.eda.report(), "report.json")
 ```
 
 ```bash
 noweda data.csv --html report.html --json report.json
 ```
+
+JSON exports replace undefined/nonfinite statistics with `null`. Column labels
+become strings; colliding labels raise an error before overwriting a file.
+The in-memory report retains its original labels and numeric values.
 
 ## Development
 

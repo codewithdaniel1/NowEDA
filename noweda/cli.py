@@ -1,8 +1,8 @@
 from noweda.dtypes import is_textual
 import argparse
-import json
 from noweda import read
 from noweda.report.html import generate_html_report
+from noweda.report.json import generate_json_report
 
 _BOLD   = "\033[1m"
 _CYAN   = "\033[36m"
@@ -69,7 +69,7 @@ def main():
 
     # ── Column Overview ───────────────────────────────────────────────────────
     print(f"\n{_BOLD}Columns{_RESET}\n{thin}")
-    col_w = max(len(c) for c in df.columns) + 2
+    col_w = max((len(str(c)) for c in df.columns), default=6) + 2
     role_w = 22
     print(f"  {'Column':<{col_w}} {'Dtype':<14} {'Role':<{role_w}} {'Unique':>8} {'Missing':>8}")
     print(f"  {'-'*col_w} {'-'*14} {'-'*role_w} {'--------':>8} {'--------':>8}")
@@ -79,7 +79,7 @@ def main():
         uniq   = df[col].nunique()
         miss   = int(df[col].isna().sum())
         miss_s = f"{_YELLOW}{miss}{_RESET}" if miss > 0 else f"{miss}"
-        print(f"  {col:<{col_w}} {dtype:<14} {role:<{role_w}} {uniq:>8} {miss_s:>8}")
+        print(f"  {str(col):<{col_w}} {dtype:<14} {role:<{role_w}} {uniq:>8} {miss_s:>8}")
 
     # ── Numeric Stats ────────────────────────────────────────────────────────
     num_cols = [c for c in df.columns if df[c].dtype.kind in ("i", "u", "f")]
@@ -101,7 +101,7 @@ def main():
             skew_s = f"{skew:>8.2f}"
             if abs(skew) > 1:
                 skew_s = f"{_YELLOW}{skew_s}{_RESET}"
-            print(f"  {col:<{col_w}} {count:>8,} {mean:>12.4g} {std:>12.4g} {mn:>10.4g} {q25:>10.4g} {med:>10.4g} {q75:>10.4g} {mx:>10.4g} {skew_s}")
+            print(f"  {str(col):<{col_w}} {count:>8,} {mean:>12.4g} {std:>12.4g} {mn:>10.4g} {q25:>10.4g} {med:>10.4g} {q75:>10.4g} {mx:>10.4g} {skew_s}")
 
     # ── Categorical Stats ─────────────────────────────────────────────────────
     cat_cols = [c for c in df.columns if is_textual(df[c])]
@@ -115,7 +115,7 @@ def main():
             uniq  = s.get("unique", 0)
             top   = str(s.get("top_value", "N/A"))[:28]
             freq  = s.get("top_freq", 0)
-            print(f"  {col:<{col_w}} {count:>8,} {uniq:>8} {top:<30} {freq:>8,}")
+            print(f"  {str(col):<{col_w}} {count:>8,} {uniq:>8} {top:<30} {freq:>8,}")
 
     # ── Insights ─────────────────────────────────────────────────────────────
     print(f"\n{_BOLD}Insights{_RESET}\n{thin}")
@@ -129,8 +129,7 @@ def main():
 
     # ── Exports ───────────────────────────────────────────────────────────────
     if args.json:
-        with open(args.json, "w") as f:
-            json.dump(report, f, indent=2)
+        generate_json_report(report, args.json)
         print(f"JSON report saved → {args.json}")
 
     if args.html:

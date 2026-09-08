@@ -186,6 +186,8 @@ target, no class-balance check is performed.
 `mean`, `median`, `std`, `min`, `max`, `q25`, `q75`, `skewness`, and `kurtosis`,
 and categorical fields `top_value` and `top_freq` where applicable.
 `encoding_df()` returns `Column` and `Encoding_Type` with possible Base64 signals.
+Use `encoding_df(include_confidence=True)` to add `Sample_Size`, `Matches` and
+`Confidence` (the sample match fraction, not a probability).
 
 ---
 
@@ -305,3 +307,25 @@ Or from the command line:
 ```bash
 noweda data.csv [--html output.html] [--json output.json]
 ```
+
+
+## Release 0.1.4 report additions
+
+`report()` adds `score_breakdown` and `encoding_details` while retaining the
+existing `results`, `scores` and `insights`. See [scoring](scoring.md) and
+[encoding detection](plugins/encoding.md) for field definitions.
+
+```python
+from noweda.report.json import generate_json_report
+generate_json_report(df.eda.report(), "report.json")
+```
+
+This UTF-8 JSON exporter converts nonfinite numbers to `null` and column labels
+to strings. Colliding labels and unsupported custom values raise before writing.
+
+`calculate_vif(df, numeric_cols=None)` in `noweda.ml_utils` uses NumPy least
+squares with an intercept and all other numeric features as predictors. Rows
+with missing or infinite values in any selected feature are excluded. Constant
+responses and fits without residual degrees of freedom return NaN; exact
+collinearity with sufficient observations returns infinity. Fewer than two
+selected columns returns an empty dictionary. No optional ML install is needed.

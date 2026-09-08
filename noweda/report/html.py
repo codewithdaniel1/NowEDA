@@ -1,4 +1,3 @@
-import json
 from datetime import datetime
 
 
@@ -24,7 +23,8 @@ def generate_html_report(report, output_path):
     duplicates_html = _duplicates_section(results.get("duplicates", {}))
     outliers_html = _outliers_table(results.get("outliers", {}))
     pii_html = _pii_table(results.get("pii", {}))
-    encoding_html = _encoding_table(results.get("encoding", {}))
+    encoding_html = _encoding_table(results.get("encoding", {}), report.get("encoding_details", {}))
+    breakdown_html = _score_breakdown_table(report.get("score_breakdown", []))
 
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -111,6 +111,7 @@ def generate_html_report(report, output_path):
     {"<ul class='insight-list'>" + insights_html + "</ul>" if insights else "<p class='empty'>No insights generated.</p>"}
   </div>
 
+  {breakdown_html}
   {schema_html}
   {missing_html}
   {duplicates_html}
@@ -220,7 +221,7 @@ def _duplicates_section(duplicates):
     dup_rows = duplicates.get("duplicate_rows", 0)
     dup_pct = duplicates.get("duplicate_rows_pct", 0.0)
     const_cols = duplicates.get("constant_columns", [])
-    const_str = ", ".join(const_cols) if const_cols else "None"
+    const_str = ", ".join(map(str, const_cols)) if const_cols else "None"
     return f"""<div class="section">
   <h2>Duplicates &amp; Constants</h2>
   <table>
@@ -267,17 +268,43 @@ def _pii_table(pii):
 </div>"""
 
 
-def _encoding_table(encoding):
+def _encoding_table(encoding, details=None):
     if not encoding:
         return ""
+    details = details or {}
     rows = "".join(
-        f"<tr><td>{_escape(col)}</td><td>{_escape(enc_type)}</td></tr>"
+        f"<tr><td>{_escape(col)}</td><td>{_escape(enc_type)}</td>"
+        f"<td>{_escape(details.get(col, {}).get('matches', 'N/A'))} / "
+        f"{_escape(details.get(col, {}).get('sample_size', 'N/A'))}</td></tr>"
         for col, enc_type in encoding.items()
     )
     return f"""<div class="section" style="border-color:#facc15">
   <h2>Encoding Detection</h2>
   <table>
-    <thead><tr><th>Column</th><th>Detected Encoding</th></tr></thead>
+    <thead><tr><th>Column</th><th>Detected Encoding</th><th>Sample matches / size</th></tr></thead>
     <tbody>{rows}</tbody>
+  </table>
+</div>"""
+
+
+def _score_breakdown_table(breakdown):
+    if not breakdown:
+        return ""
+    rows = []
+    for entry in breakdown:
+        reason = str(entry.get("reason", ""))
+        evidence = entry.get("evidence", {})
+        if entry.get("rule") == "outliers":
+            rate = evidence.get("rate")
+            reason += f"; observed rate: {rate:.2%}" if rate is not None else "; rate unavailable"
+        contributions = entry.get("contributions", {})
+        cells = "".join(f"<td>{_escape(contributions.get(key, 0))}</td>"
+                        for key in ("data_quality", "model_readiness", "risk"))
+        rows.append(f"<tr><td>{_escape(reason)}</td>{cells}</tr>")
+    return f"""<div class="section">
+  <h2>Score Contributions</h2>
+  <p>Starting values: quality 100, readiness 100, risk 0. Add each contribution below.</p>
+  <table><thead><tr><th>Rule</th><th>Quality</th><th>Readiness</th><th>Risk</th></tr></thead>
+    <tbody>{''.join(rows)}</tbody>
   </table>
 </div>"""

@@ -17,29 +17,24 @@ def _in_notebook():
     return bool(shell and shell.__class__.__name__ == "ZMQInteractiveShell")
 
 
-def _progress_bar(percent, width=24):
-    filled = int(round(width * max(0, min(percent, 100)) / 100))
-    filled = max(0, min(filled, width))
-    return "[" + ("#" * filled) + ("-" * (width - filled)) + "]"
-
-
-def _render_line(message, percent, state="running"):
-    bar = _progress_bar(100 if state == "done" else percent)
+def _render_line(message, elapsed, state="running"):
     if state == "running":
-        return f"{bar} {percent:3d}% {message}"
+        return f"[...] Working ({elapsed}s) {message}"
     if state == "done":
-        return f"{bar} 100% {message}"
+        return f"[{'#' * 24}] 100% {message}"
+    if state == "stopped":
+        return f"[stopped] Stopped before completion: {message}"
     return f"[{'!' * 24}] ERR  {message}"
 
 
-def _notebook_html(message, percent, state="running"):
-    return f"<pre>{html.escape(_render_line(message, percent, state))}</pre>"
+def _notebook_html(message, elapsed, state="running"):
+    return f"<pre>{html.escape(_render_line(message, elapsed, state))}</pre>"
 
 
 class _ProgressDisplay:
     def __init__(self, message):
         self.message = message
-        self.percent = 0
+        self.elapsed = 0
         self.state = "running"
         self._stop = threading.Event()
         self._lock = threading.Lock()
@@ -66,14 +61,8 @@ class _ProgressDisplay:
         elif self._handle is None:
             print(_render_line(self.message, 0, "running"), file=sys.stderr)
 
-    def _elapsed_percent(self):
-        elapsed = time.monotonic() - self._start_time
-        # A small, traditional-feeling ramp: 0 -> 99 over ~8 seconds.
-        # The last 1% is reserved for the explicit completion state.
-        return min(99, int((elapsed / 8.0) * 99))
-
     def _update_terminal(self):
-        line = _render_line(self.message, self.percent, self.state)
+        line = _render_line(self.message, self.elapsed, self.state)
         padded = line.ljust(self._prev_len)
         sys.stderr.write("\r" + padded)
         sys.stderr.flush()
@@ -85,15 +74,13 @@ class _ProgressDisplay:
         try:
             from IPython.display import HTML
 
-            self._handle.update(HTML(_notebook_html(self.message, self.percent, self.state)))
+            self._handle.update(HTML(_notebook_html(self.message, self.elapsed, self.state)))
         except Exception:
             pass
 
     def _tick(self):
-        new_percent = self._elapsed_percent()
         with self._lock:
-            if new_percent > self.percent:
-                self.percent = new_percent
+            self.elapsed = int(time.monotonic() - self._start_time)
             if self.state == "running":
                 if self._handle is not None:
                     self._update_notebook()
@@ -111,15 +98,12 @@ class _ProgressDisplay:
 
         with self._lock:
             self.state = state
-            if state == "done":
-                self.percent = 100
-
             if self._handle is not None:
                 self._update_notebook()
             elif sys.stderr.isatty():
                 self._update_terminal()
             else:
-                print(_render_line(self.message, self.percent, state), file=sys.stderr)
+                print(_render_line(self.message, self.elapsed, state), file=sys.stderr)
 
         if sys.stderr.isatty():
             sys.stderr.write("\n")
@@ -133,7 +117,10 @@ def loading(message):
     progress.start()
     try:
         yield
-    except Exception:
+    except (GeneratorExit, KeyboardInterrupt):
+        progress.finish("stopped")
+        raise
+    except BaseException:
         progress.finish("error")
         raise
     else:

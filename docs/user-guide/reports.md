@@ -257,12 +257,16 @@ A flat list of human-readable strings, ordered by category:
 ### To JSON
 
 ```python
-import json
+from noweda.report.json import generate_json_report
 
 report = df.noweda.report()
-with open("report.json", "w") as f:
-    json.dump(report, f, indent=2)
+generate_json_report(report, "report.json")
 ```
+
+Exports use strict JSON: undefined statistics and nonfinite numbers become `null`.
+Column labels become strings; labels that collide after conversion raise before
+the destination is opened. In-memory reports retain their original values.
+Unsupported custom plugin values also raise before writing.
 
 ### To HTML
 

@@ -8,26 +8,44 @@ class Scorer:
         model_readiness : 0-100  (higher = more ready for ML)
     """
 
-    def compute(self, results):
+    def compute(self, results, explain=False):
         scores = {
             "data_quality": 100,
             "risk": 0,
             "model_readiness": 100,
         }
 
-        self._penalise_missing(results.get("missing", {}), scores)
-        self._penalise_duplicates(results.get("duplicates", {}), scores)
-        self._penalise_outliers(results.get("outliers", {}), scores)
-        self._penalise_skew(results.get("stats", {}), scores)
-        self._add_pii_risk(results.get("pii", {}), scores)
-        self._add_encoding_risk(results.get("encoding", {}), scores)
-        self._penalise_schema(results.get("schema", {}), scores)
+        breakdown = []
+        rules = [
+            ("missing", self._penalise_missing, "Missing-value penalties per column"),
+            ("duplicates", self._penalise_duplicates, "Duplicate rows and constant columns"),
+            ("outliers", self._penalise_outliers, "IQR outliers as a fraction of observed numeric values"),
+            ("stats", self._penalise_skew, "Readiness penalty for columns with absolute skewness > 2"),
+            ("pii", self._add_pii_risk, "15 risk points per column with PII signals"),
+            ("encoding", self._add_encoding_risk, "10 risk points per column with encoding signals"),
+            ("schema", self._penalise_schema, "3 readiness points deducted per text or unknown column"),
+        ]
+        for key, rule, reason in rules:
+            before = scores.copy()
+            evidence = None
+            if key == "outliers":
+                evidence = rule(results.get(key, {}), scores, results.get("stats", {}))
+            else:
+                rule(results.get(key, {}), scores)
+            entry = {"rule": key, "reason": reason,
+                     "contributions": {k: scores[k] - before[k] for k in scores}}
+            if evidence is not None:
+                entry["evidence"] = evidence
+            breakdown.append(entry)
 
         # Clamp quality and readiness to [0, 100]
+        before = scores.copy()
         scores["data_quality"] = max(0, min(100, scores["data_quality"]))
         scores["model_readiness"] = max(0, min(100, scores["model_readiness"]))
+        breakdown.append({"rule": "clamp", "reason": "Keep quality and readiness within 0–100",
+                          "contributions": {k: scores[k] - before[k] for k in scores}})
 
-        return scores
+        return (scores, breakdown) if explain else scores
 
     # ------------------------------------------------------------------
 
@@ -55,14 +73,21 @@ class Scorer:
         scores["data_quality"] -= len(const_cols) * 3
         scores["model_readiness"] -= len(const_cols) * 5
 
-    def _penalise_outliers(self, outliers, scores):
+    def _penalise_outliers(self, outliers, scores, stats):
+        # Count observed cells in the same columns that have outlier results.
+        # Missing denominators from custom plugins must not imply zero outliers.
+        counts = [stats.get(col, {}).get("count") for col in outliers]
+        observed = sum(counts) if all(c is not None for c in counts) else None
         total = sum(outliers.values())
-        if total > 50:
+        rate = total / observed if observed else None
+        if rate is not None and rate > 0.05:
             scores["data_quality"] -= 10
             scores["model_readiness"] -= 10
-        elif total > 10:
+        elif rate is not None and rate > 0.01:
             scores["data_quality"] -= 5
             scores["model_readiness"] -= 5
+        return {"outlier_count": total, "observed_numeric_values": observed,
+                "rate": rate, "thresholds": {"minor_above": 0.01, "major_above": 0.05}}
 
     def _penalise_skew(self, stats, scores):
         heavy_skew_cols = [

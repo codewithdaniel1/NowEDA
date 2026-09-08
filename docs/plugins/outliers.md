@@ -70,11 +70,16 @@ print(outlier_rows)
 
 ## Outlier Thresholds and Scoring
 
-| Total outlier count | Quality penalty | Readiness penalty |
+| Outlier rate among observed numeric values | Quality penalty | Readiness penalty |
 |---|---|---|
-| `> 50` across all columns | −10 | −10 |
-| `> 10` across all columns | −5 | −5 |
-| `≤ 10` | 0 | 0 |
+| `> 5%` | −10 | −10 |
+| `> 1%` and `≤ 5%` | −5 | −5 |
+| `≤ 1%` | 0 | 0 |
+
+Starting in 0.1.4, the denominator sums nonmissing counts in the numeric columns
+with outlier results. The same rate incurs the same penalty at any dataset size.
+Missing denominators produce an unavailable rate and no penalty. See
+[score contributions](../scoring.md#outlier-rates-and-score-contributions-014).
 
 ---
 

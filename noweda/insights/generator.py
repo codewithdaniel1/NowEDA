@@ -27,16 +27,16 @@ class InsightGenerator:
 
         if id_cols:
             insights.append(
-                f"Likely identifier column(s) detected: {', '.join(id_cols)}. "
+                f"Likely identifier column(s) detected: {', '.join(map(str, id_cols))}. "
                 "Consider excluding from modelling."
             )
         if cat_cols:
             insights.append(
-                f"Column(s) with low cardinality (likely categorical): {', '.join(cat_cols)}."
+                f"Column(s) with low cardinality (likely categorical): {', '.join(map(str, cat_cols))}."
             )
         if datetime_cols:
             insights.append(
-                f"Datetime column(s) detected: {', '.join(datetime_cols)}. "
+                f"Datetime column(s) detected: {', '.join(map(str, datetime_cols))}. "
                 "Temporal features may be valuable."
             )
 
@@ -69,7 +69,7 @@ class InsightGenerator:
             )
         if const_cols:
             insights.append(
-                f"Constant (zero-variance) column(s) detected: {', '.join(const_cols)}. "
+                f"Constant (zero-variance) column(s) detected: {', '.join(map(str, const_cols))}. "
                 "These carry no information and can be dropped."
             )
 
@@ -95,7 +95,7 @@ class InsightGenerator:
         seen = set()
         for col1, corrs in correlation.items():
             for col2, val in corrs.items():
-                pair = tuple(sorted([col1, col2]))
+                pair = frozenset((col1, col2))
                 if col1 == col2 or pair in seen:
                     continue
                 seen.add(pair)

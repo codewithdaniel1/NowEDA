@@ -8,6 +8,7 @@ text, JSON, and all chunked reads use pandas for consistent parsing.
 """
 
 import os
+from contextlib import closing
 import pandas as pd
 from noweda.ui import loading
 
@@ -90,6 +91,8 @@ def read_chunked(file_path, chunksize=10_000, concat=True, **kwargs):
     Use concat=False for bounded-memory iteration; concat=True retains all chunks
     and allocates a combined DataFrame. Pandas natively supports
     chunked reading via the `chunksize` parameter for CSV and JSON files.
+    Wrap a streaming generator in contextlib.closing() if processing may stop
+    early. Full exhaustion reports 100%; closing early reports stopped.
 
     Supported formats for chunked reading
     ----------
@@ -164,16 +167,15 @@ def read_chunked(file_path, chunksize=10_000, concat=True, **kwargs):
         kwargs.setdefault("lines", True)
         return pd.read_json(file_path, chunksize=chunksize, **kwargs)
 
-    iterator = _pandas_iterator()
-
     if concat:
         with loading(f"NowEDA · Reading {os.path.basename(file_path)} in chunks"):
-            return pd.concat(list(iterator), ignore_index=True)
+            with closing(_pandas_iterator()) as iterator:
+                return pd.concat(list(iterator), ignore_index=True)
 
     def _chunk_generator():
         with loading(f"NowEDA · Reading {os.path.basename(file_path)} in chunks"):
-            for chunk in iterator:
-                yield chunk
+            with closing(_pandas_iterator()) as iterator:
+                yield from iterator
 
     return _chunk_generator()
 

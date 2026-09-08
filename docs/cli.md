@@ -14,6 +14,10 @@ Reads the file, runs all plugins, and prints a rich report to the terminal — i
 
 While the file is loading and the report is being built, the CLI shows a small live status indicator so it is clear what NowEDA is doing.
 
+Running operations show elapsed time, not an estimated percentage of data read.
+Successful completion shows **100%**. Interruptions show **Stopped before completion**;
+reader failures show **ERR**.
+
 ---
 
 ## Commands and Options
@@ -104,7 +108,9 @@ Opens `report.html` in any browser. Includes score cards, insights, schema table
 noweda data.csv --json report.json
 ```
 
-The JSON file contains the full report: plugin results, scores, and insights.
+The JSON file contains plugin results, scores, insights, score contributions and
+encoding sample evidence. Undefined/nonfinite numbers become `null`, ensuring
+strict JSON that standard parsers can read.
 
 ---
 

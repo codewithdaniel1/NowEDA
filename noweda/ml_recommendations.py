@@ -538,7 +538,7 @@ def preprocessing_pipeline(p, df):
     # Step 1: Drop IDs
     id_cols = [c for c, info in {} .items()]  # placeholder
     schema_roles = {}
-    id_cols = [c for c in df.columns if "id" in c.lower() and df[c].nunique() == len(df)]
+    id_cols = [c for c in df.columns if "id" in str(c).lower() and df[c].nunique() == len(df)]
     if id_cols:
         steps.append(f"1. DROP identifier columns: {id_cols} — not useful as ML features")
 

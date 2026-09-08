@@ -31,8 +31,8 @@ Starts at **100** and is penalised by data quality issues.
 | Duplicate rows (many) | >10% of rows are duplicates | −10 |
 | Duplicate rows (some) | >0% of rows are duplicates | −3 |
 | Constant columns | Each zero-variance column | −3 per column |
-| Outliers (many) | >50 total outliers across all columns | −10 |
-| Outliers (some) | >10 total outliers across all columns | −5 |
+| Outliers (many) | >5% of observed numeric values flagged | −10 |
+| Outliers (some) | >1% and ≤5% of observed numeric values flagged | −5 |
 
 Final score is clamped to `[0, 100]`.
 
@@ -43,7 +43,7 @@ Starting score:                   100
 Column 'encoded_field' >50% null: -10
 Column 'email' 30-50% null:        -5
 Minor nulls in 3 columns:          -6
-3 outliers in 'salary':             0  (total ≤10, no penalty)
+3 outliers / 1,000 numeric values:   0  (0.3%, no penalty)
 ─────────────────────────────────────
 data_quality:                       79
 ```
@@ -65,7 +65,7 @@ There is no upper bound on `risk`. A dataset with 5 PII columns and 3 encoded co
 
 | Risk value | Level | Recommendation |
 |---|---|---|
-| 0 | None | Safe to share |
+| 0 | No signals detected | Pattern checks do not establish safety |
 | 1 – 20 | Low | Review findings before sharing |
 | 21 – 50 | Moderate | Redact or mask identified columns |
 | > 50 | High | Do not share without thorough review |
@@ -83,8 +83,8 @@ Starts at **100** and is penalised by anything that would require preprocessing 
 | Missing values (low) | >0–30% missing per column | −3 per column |
 | Constant columns | Each zero-variance column | −5 per column |
 | Heavy skew | Each column with `|skewness| > 2` | −5 per column |
-| Outliers (many) | >50 total outliers | −10 |
-| Outliers (some) | >10 total outliers | −5 |
+| Outliers (many) | >5% of observed numeric values flagged | −10 |
+| Outliers (some) | >1% and ≤5% of observed numeric values flagged | −5 |
 | Text/unknown columns | Each column with role `text` or `unknown` | −3 per column |
 
 Final score is clamped to `[0, 100]`.
@@ -134,4 +134,32 @@ else:
 
 ## Scorer Source
 
-The scoring logic lives in [noweda/scoring/scorer.py](https://github.com/codewithdaniel1/NowEDA/blob/main/noweda/scoring/scorer.py). To customise scoring for your domain (different thresholds, additional penalties), subclass `Scorer` and pass it to a custom engine.
+The scoring logic lives in [noweda/scoring/scorer.py](https://github.com/codewithdaniel1/NowEDA/blob/main/noweda/scoring/scorer.py). To customise scoring for your domain (different thresholds, additional penalties), subclass `Scorer` and call it from a custom engine implementation.
+
+
+## Outlier Rates and Score Contributions (0.1.4)
+
+The outlier rate is the sum of IQR outlier counts divided by the sum of nonmissing
+counts in the same numeric columns. Text cells and missing cells do not enter the
+denominator. A row can contribute multiple observed cells and multiple outliers.
+The penalty uses this pooled rate, so the same rate incurs the same penalty at
+different dataset sizes. Other rules, including duplicate and skewness penalties,
+can still produce different overall scores.
+
+If no observed values or no denominator is available (for example in custom
+plugin results), the rate is unavailable and no outlier penalty is applied.
+Empty DataFrame reports explicitly say their scores are not informative.
+
+```python
+report = df.eda.report()
+for entry in report["score_breakdown"]:
+    print(entry["rule"], entry["contributions"])
+    if "evidence" in entry:
+        print(entry["evidence"])
+```
+
+Start at quality 100, readiness 100 and risk 0, then add each rule's contributions.
+The final `clamp` entry accounts for adjustments to keep quality and readiness in
+range, so contributions reconcile exactly to the returned scores. Outlier
+evidence includes the count, observed numeric value count, rate and thresholds.
+HTML reports include the same contributions.

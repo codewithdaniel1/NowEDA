@@ -4,6 +4,27 @@ All notable changes to NowEDA are documented here.
 
 ---
 
+## [0.1.4] — 2026-09-08
+
+### Fixed
+
+- Chunk readers close on exhaustion, explicit closure and errors. Loading indicators stop on generator closure or keyboard interruption; running tasks show elapsed time instead of an artificial percentage, and only completed operations show 100%.
+- Updated the playground for pandas chunking, full-stream memory comparisons, measured DataFrame sizes, 0.1.4 evidence fields and strict JSON export. Removed obsolete saved outputs.
+- PII detection recognizes supported card numbers with spaces or hyphens and checks their Luhn checksum. Counts represent matching cells, even with duplicate row indices; separate phone numbers in a card-containing cell remain detectable.
+- VIF uses NumPy multivariate least squares with an intercept in every installation. Constant columns and insufficient complete observations return NaN; exact estimable collinearity returns infinity. Large finite VIF values are no longer rounded to infinity.
+- Statistical reports support integer and tuple column labels and explain empty inputs. Duplicate column labels fail with a clear error instead of silently losing results.
+- Base64 detection rejects short ordinary words such as `John`, validates encoding strictly, and requires additional evidence plus at least six matches and an 80% match rate in the first 20 nonmissing values.
+- CLI JSON exports map undefined/nonfinite numbers to `null` and enforce strict JSON. The new `generate_json_report()` helper provides the same behavior in Python without changing the in-memory report.
+
+### Changed
+
+- Outlier penalties use the fraction of observed numeric cells flagged as IQR outliers: more than 1% deducts 5 points; more than 5% deducts 10 points from quality and readiness. Scores may differ from 0.1.3 for the same data.
+- Reports add `score_breakdown` (including clamping adjustments) and `encoding_details` (sample size, matches and empirical confidence). Existing plugin output shapes remain unchanged.
+- `encoding_df(include_confidence=True)` exposes sample evidence. HTML reports display score contributions and Base64 sample counts.
+- JSON object keys use string column labels; ambiguous label conversions are rejected before writing.
+
+---
+
 ## [0.1.3] — 2026-09-08
 
 ### Fixed

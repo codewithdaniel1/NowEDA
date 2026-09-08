@@ -138,7 +138,7 @@ No. The Correlation plugin only runs on numeric columns. With no numeric data, t
 
 **Q: The PII plugin didn't flag my phone numbers. Why?**
 
-The built-in PII plugin only detects email addresses. Phone detection requires a custom plugin — see [Writing Custom Plugins](plugins/custom.md) and the [Security Audit Example](examples/security-audit.md).
+The built-in plugin checks ten-digit US-style phone numbers in text columns, with an optional `+1`. Other countries, short local numbers and numeric-typed columns may be missed. Card-shaped spans are excluded to avoid false phone matches. See [PII detection](plugins/pii.md) for supported formats.
 
 ---
 

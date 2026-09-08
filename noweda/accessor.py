@@ -206,7 +206,7 @@ class NowEDAAccessor:
             "Value": [
                 len(self._df),
                 dups.get("duplicate_rows", 0),
-                ", ".join(dups.get("constant_columns", [])) or "None"
+                ", ".join(map(str, dups.get("constant_columns", []))) or "None"
             ]
         })
 
@@ -312,17 +312,22 @@ class NowEDAAccessor:
 
         return pd.DataFrame(rows)
 
-    def encoding_df(self):
+    def encoding_df(self, include_confidence=False):
         """Return Column and Encoding_Type for possible Base64 signals.
 
         Detection samples up to the first 20 nonmissing values per text column.
-        It does not identify arbitrary obfuscation or return raw samples.
+        With include_confidence=True, add sample size, matches and confidence
+        (the sample match fraction, not a calibrated probability).
         """
         self._ensure_analyzed()
         encoding = self._report["results"].get("encoding", {})
-        if not encoding:
-            return pd.DataFrame({"Column": [], "Encoding_Type": []})
-        return pd.DataFrame(list(encoding.items()), columns=["Column", "Encoding_Type"])
+        table = pd.DataFrame(list(encoding.items()), columns=["Column", "Encoding_Type"])
+        if include_confidence:
+            details = self._report.get("encoding_details", {})
+            for label, key in [("Sample_Size", "sample_size"), ("Matches", "matches"),
+                               ("Confidence", "confidence")]:
+                table[label] = [details.get(col, {}).get(key) for col in encoding]
+        return table
 
     def statsall(self):
         """Print a rich full-analysis report to the terminal/notebook.
@@ -368,6 +373,10 @@ class NowEDAAccessor:
         print(f"  Rows    : {_BOLD}{len(df):,}{_RESET}")
         print(f"  Columns : {_BOLD}{len(df.columns)}{_RESET}")
 
+        if df.empty:
+            print("  Empty DataFrame: no rows or no columns to analyze.")
+            return
+
         # ── Scores ───────────────────────────────────────────────────────────
         h2("Scores")
         dq  = scores.get("data_quality", "N/A")
@@ -379,7 +388,7 @@ class NowEDAAccessor:
 
         # ── Dtypes ───────────────────────────────────────────────────────────
         h2("Column Types")
-        col_w = max(len(c) for c in df.columns) + 2
+        col_w = max((len(str(c)) for c in df.columns), default=6) + 2
         role_w = 20
         print(f"  {'Column':<{col_w}} {'Dtype':<14} {'Role':<{role_w}} {'Conf':>5} {'Unique':>8} {'Missing':>8}")
         print(f"  {'-'*col_w} {'-'*14} {'-'*role_w} {'-----':>5} {'--------':>8} {'--------':>8}")
@@ -394,7 +403,7 @@ class NowEDAAccessor:
             # Color confidence: high (>0.9) green, medium yellow, low red
             conf_color = _GREEN if conf >= 0.9 else (_YELLOW if conf >= 0.75 else _RED)
             conf_display = f"{conf_color}{conf:>5.2f}{_RESET}"
-            print(f"  {col:<{col_w}} {dtype:<14} {role:<{role_w}} {conf_display} {uniq:>8} {miss_display}")
+            print(f"  {str(col):<{col_w}} {dtype:<14} {role:<{role_w}} {conf_display} {uniq:>8} {miss_display}")
 
         # ── Per-column stats ─────────────────────────────────────────────────
         h2("Descriptive Statistics")
@@ -418,7 +427,7 @@ class NowEDAAccessor:
                 skew_str = f"{skew:>8.2f}"
                 if abs(skew) > 1:
                     skew_str = f"{_YELLOW}{skew_str}{_RESET}"
-                print(f"  {col:<{col_w}} {count:>8,} {mean:>12.4g} {std:>12.4g} {mn:>10.4g} {q25:>10.4g} {med:>10.4g} {q75:>10.4g} {mx:>10.4g} {skew_str}")
+                print(f"  {str(col):<{col_w}} {count:>8,} {mean:>12.4g} {std:>12.4g} {mn:>10.4g} {q25:>10.4g} {med:>10.4g} {q75:>10.4g} {mx:>10.4g} {skew_str}")
 
         # Categorical / text columns
         cat_cols = [c for c in df.columns if is_textual(df[c])]
@@ -451,7 +460,7 @@ class NowEDAAccessor:
                     diversity_color = "N/A"
 
                 freq_pct = (freq / count * 100) if count > 0 else 0
-                print(f"  {col:<{col_w}} {count:>8,} {uniq:>8} {diversity_color:>10} {top:<28} {freq_pct:>7.1f}%")
+                print(f"  {str(col):<{col_w}} {count:>8,} {uniq:>8} {diversity_color:>10} {top:<28} {freq_pct:>7.1f}%")
 
         # ── Insights ──────────────────────────────────────────────────────────
         h2("Insights")
@@ -478,9 +487,9 @@ class NowEDAAccessor:
             # Print column status
             if issues:
                 issues_str = "; ".join(issues)
-                print(f"  {col:<{col_w}} {status_colored:>15}  ({issues_str})")
+                print(f"  {str(col):<{col_w}} {status_colored:>15}  ({issues_str})")
             else:
-                print(f"  {col:<{col_w}} {status_colored}")
+                print(f"  {str(col):<{col_w}} {status_colored}")
 
         # ── Temporal Analysis ─────────────────────────────────────────────────
         temporal = detect_temporal_columns(df)
@@ -531,9 +540,11 @@ class NowEDAAccessor:
                 if high_vif:
                     print(f"\n  {_YELLOW}⚠ Multicollinearity Detected (VIF > 5):{_RESET}")
                     for col, vif in sorted(high_vif.items(), key=lambda x: -x[1])[:5]:
-                        print(f"    {col:20s}: VIF = {vif:>6.1f}  → Consider dropping or combining")
-                else:
-                    print(f"\n  {_GREEN}✓ Low Multicollinearity (all VIF < 5){_RESET}")
+                        print(f"    {str(col):20s}: VIF = {vif:>6.1f}  → Consider dropping or combining")
+                elif all(pd.notna(vif) for vif in vif_data.values()):
+                    print(f"\n  {_GREEN}✓ Low Multicollinearity (all VIF <= 5){_RESET}")
+                if any(pd.isna(vif) for vif in vif_data.values()):
+                    print("  VIF unavailable for constant columns or insufficient complete observations.")
 
         # Scaling recommendations
         scaling_needed = []
@@ -545,7 +556,7 @@ class NowEDAAccessor:
         if scaling_needed:
             print(f"\n  {_YELLOW}Scaling Recommended:{_RESET}")
             for col in scaling_needed[:5]:
-                print(f"    {col:20s}: Use StandardScaler or MinMaxScaler")
+                print(f"    {str(col):20s}: Use StandardScaler or MinMaxScaler")
             if len(scaling_needed) > 5:
                 print(f"    … and {len(scaling_needed) - 5} more")
 
@@ -559,7 +570,7 @@ class NowEDAAccessor:
         if transform_candidates:
             print(f"\n  {_YELLOW}Transformation Suggestions:{_RESET}")
             for col, suggestion in transform_candidates[:5]:
-                print(f"    {col:20s}: {suggestion}")
+                print(f"    {str(col):20s}: {suggestion}")
             if len(transform_candidates) > 5:
                 print(f"    … and {len(transform_candidates) - 5} more")
 
@@ -574,7 +585,7 @@ class NowEDAAccessor:
         if cardinality_issues:
             print(f"\n  {_RED}Cardinality Issues:{_RESET}")
             for col, issue in cardinality_issues:
-                print(f"    {col:20s}: {issue}")
+                print(f"    {str(col):20s}: {issue}")
 
         # Rare categories
         rare_issues = {}
@@ -587,7 +598,7 @@ class NowEDAAccessor:
             print(f"\n  {_YELLOW}Rare Categories Detected (<1%):{_RESET}")
             for col, rare_cats in list(rare_issues.items())[:5]:
                 rare_str = ", ".join(f"{k}({v:.1%})" for k, v in list(rare_cats.items())[:2])
-                print(f"    {col:20s}: {rare_str}")
+                print(f"    {str(col):20s}: {rare_str}")
                 if len(rare_cats) > 2:
                     print(f"                     {' and ' + str(len(rare_cats) - 2) + ' more rare values'}")
 
@@ -603,7 +614,7 @@ class NowEDAAccessor:
                     rec = f"impute or drop ({missing_pct:.0f}% missing)"
                 else:
                     rec = f"impute ({missing_pct:.0f}% missing)"
-                print(f"    {col:20s}: {rec}")
+                print(f"    {str(col):20s}: {rec}")
 
         print(f"\n{_CYAN}{'='*70}{_RESET}\n")
 
@@ -662,7 +673,7 @@ class NowEDAAccessor:
         def is_id_column(col_name, col_values):
             """Detect ID columns by name. Only exclude if column name suggests it's an identifier."""
             # Check column name for ID indicators
-            col_lower = col_name.lower()
+            col_lower = str(col_name).lower()
             is_id_like = (
                 col_lower in ("id", "customer_id", "user_id", "record_id", "index", "idx") or
                 col_lower.endswith("_id") or
@@ -688,7 +699,7 @@ class NowEDAAccessor:
         # Helper: detect if a numeric column is actually PII (credit cards, etc.)
         def is_numeric_pii(col_name, col_values):
             """Detect numeric PII: credit_card, account_number, etc."""
-            col_lower = col_name.lower()
+            col_lower = str(col_name).lower()
             pii_indicators = (
                 "credit" in col_lower or
                 "card" in col_lower or
@@ -1295,9 +1306,9 @@ class NowEDAAccessor:
             removed = cols1 - cols2
             added = cols2 - cols1
             if removed:
-                print(f"  {_RED}Removed:{_RESET} {', '.join(sorted(removed))}")
+                print(f"  {_RED}Removed:{_RESET} {', '.join(sorted(map(str, removed)))}")
             if added:
-                print(f"  {_GREEN}Added:{_RESET} {', '.join(sorted(added))}")
+                print(f"  {_GREEN}Added:{_RESET} {', '.join(sorted(map(str, added)))}")
 
         # Role changes for common columns
         role_changes = {}
@@ -1310,7 +1321,7 @@ class NowEDAAccessor:
         if role_changes:
             print(f"\n{_BOLD}Column Role Changes:{_RESET}")
             for col, (r1, r2) in role_changes.items():
-                print(f"  {col:<20} : {r1} → {r2}")
+                print(f"  {str(col):<20} : {r1} → {r2}")
 
         # PII comparison
         pii1 = report1.get("results", {}).get("pii", {})
@@ -1319,10 +1330,10 @@ class NowEDAAccessor:
             print(f"\n{_BOLD}PII Detection Changes:{_RESET}")
             new_pii = set(pii2.keys()) - set(pii1.keys())
             if new_pii:
-                print(f"  {_RED}New PII detected in:{_RESET} {', '.join(sorted(new_pii))}")
+                print(f"  {_RED}New PII detected in:{_RESET} {', '.join(sorted(map(str, new_pii)))}")
             removed_pii = set(pii1.keys()) - set(pii2.keys())
             if removed_pii:
-                print(f"  {_GREEN}PII removed from:{_RESET} {', '.join(sorted(removed_pii))}")
+                print(f"  {_GREEN}PII removed from:{_RESET} {', '.join(sorted(map(str, removed_pii)))}")
 
         print(f"\n{_CYAN}{'='*70}{_RESET}\n")
 
