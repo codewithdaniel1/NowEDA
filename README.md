@@ -2,7 +2,7 @@
   <img src="https://raw.githubusercontent.com/codewithdaniel1/NowEDA/main/assets/noweda-wordmark-logo.svg" alt="NowEDA" width="700" />
 </div>
 
-[![PyPI version](https://img.shields.io/pypi/v/noweda)](https://pypi.org/project/noweda/)
+[![PyPI version](https://img.shields.io/pypi/v/noweda?cacheSeconds=300)](https://pypi.org/project/noweda/)
 
 # NowEDA
 
