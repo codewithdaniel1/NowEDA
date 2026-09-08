@@ -66,6 +66,8 @@ def test_vif_constants_missing_infinite_and_insufficient_rows():
     df = _orthogonal_features()[["x", "y"]].astype("Float64")
     df.loc[8] = [None, 5]
     df.loc[9] = [np.inf, 6]
+    # pandas 1.3 may cast extension columns to object when appending rows.
+    df = df.astype("Float64")
     df["constant"] = 7.
     vif = calculate_vif(df)
     assert vif["x"] == pytest.approx(1)

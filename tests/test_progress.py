@@ -2,6 +2,7 @@
 from contextlib import closing
 import sys
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pandas as pd
 import pytest
@@ -18,6 +19,8 @@ def source_and_readers(tmp_path, monkeypatch):
     readers = []
     def track(*args, **kwargs):
         reader = original(*args, **kwargs)
+        # Observe the public close method; handle storage changed across pandas.
+        reader.close = Mock(wraps=reader.close)
         readers.append(reader)
         return reader
     monkeypatch.setattr(pd, "read_csv", track)
@@ -32,7 +35,7 @@ def test_chunk_completion_closes_reader_and_reports_100(source_and_readers, caps
     if not concat:
         result = pd.concat(list(result))
     assert result.x.tolist() == [1, 2, 3]
-    assert readers[0].handles.handle.closed
+    assert readers[0].close.called
     output = capsys.readouterr().err
     assert "100%" in output
     assert "99%" not in output
@@ -45,7 +48,7 @@ def test_early_break_with_closing_stops_instead_of_claiming_completion(source_an
         for chunk in chunks:
             assert chunk.x.tolist() == [1]
             break
-    assert readers[0].handles.handle.closed
+    assert readers[0].close.called
     output = capsys.readouterr().err
     assert "Stopped before completion" in output
     assert "100%" not in output
@@ -65,7 +68,7 @@ def test_processing_failure_closes_retained_generator(source_and_readers, capsys
         with closing(chunks):
             for chunk in chunks:
                 raise RuntimeError("processing failed")
-    assert readers[0].handles.handle.closed
+    assert readers[0].close.called
     assert "Stopped before completion" in capsys.readouterr().err
 
 

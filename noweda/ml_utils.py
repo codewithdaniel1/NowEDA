@@ -21,7 +21,11 @@ def calculate_vif(df, numeric_cols=None):
 
     # Regress each feature on ALL other features. Centering includes an
     # intercept, so results do not depend on offsets or optional dependencies.
-    values = df[numeric_cols].to_numpy(dtype=float, na_value=np.nan)
+    # Select columns individually: pandas 1.3 can reject a list mixing scalar
+    # and tuple labels before it reaches numeric conversion.
+    values = np.column_stack([
+        df[col].to_numpy(dtype=float, na_value=np.nan) for col in numeric_cols
+    ])
     values = values[np.isfinite(values).all(axis=1)]
     vif_data = dict.fromkeys(numeric_cols, float("nan"))
     if len(values) < 2:
