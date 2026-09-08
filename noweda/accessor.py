@@ -1,3 +1,5 @@
+from noweda.dtypes import is_textual
+import hashlib
 import pandas as pd
 from functools import wraps
 from noweda.core.engine import AutoEDAEngine
@@ -19,12 +21,41 @@ class NowEDAAccessor:
 
     def __init__(self, pandas_obj):
         self._df = pandas_obj
-        self._report = None
+        # pandas 3 creates a new accessor on each attribute access. Keep state
+        # on the DataFrame, outside attrs (which pandas propagates to copies).
+        self._cache = pandas_obj.__dict__.setdefault(
+            "_noweda_report_cache", {"report": None, "fingerprint": None}
+        )
+
+    @property
+    def _report(self):
+        return self._cache["report"]
+
+    @_report.setter
+    def _report(self, value):
+        self._cache["report"] = value
 
     def _ensure_analyzed(self):
-        if self._report is None:
+        # Check values, row order, index, column names and dtype metadata.
+        digest = hashlib.sha256(pd.util.hash_pandas_object(self._df, index=True).values.tobytes())
+        digest.update(repr(tuple(self._df.columns)).encode())
+        digest.update(repr([repr(dtype) for dtype in self._df.dtypes]).encode())
+        fingerprint = digest.digest()
+        if self._report is None or fingerprint != self._cache["fingerprint"]:
             engine = AutoEDAEngine(default_plugins())
             self._report = engine.run_df(self._df)
+            self._cache["fingerprint"] = fingerprint
+
+    def refresh(self):
+        """Force analysis to run again and return the complete report."""
+        self._report = None
+        self._ensure_analyzed()
+        return self._report
+
+    def summary(self):
+        """Return raw results from all built-in plugins."""
+        self._ensure_analyzed()
+        return self._report["results"]
 
     def insights(self):
         self._ensure_analyzed()
@@ -90,34 +121,10 @@ class NowEDAAccessor:
             truncated = [text[:50] + "..." if len(text) > 50 else text for text in insights]
             df_result = pd.DataFrame({"Insight": truncated})
 
-        # Set pandas display options to show full content
-        with pd.option_context('display.max_colwidth', None):
-            pass
-
         return df_result
 
     def schema_df(self):
-        """Return inferred column roles, types, and confidence scores as a DataFrame.
-
-        NowEDA automatically detects column roles (id, categorical, numeric, datetime, text)
-        and provides confidence scores for each inference.
-
-        Returns:
-            DataFrame with columns: [Column, Role, Type, Confidence]
-                - Column: Column name
-                - Role: Inferred role (id, categorical, numeric, datetime, text, unknown)
-                - Type: Detected dtype
-                - Confidence: Confidence score (0-1) for the inferred role
-
-        Example:
-            schema = df.eda.schema_df()
-            print(schema)
-            #      Column       Role      Type  Confidence
-            # 0      user_id        id     int64        0.99
-            # 1      age      numeric   int64        0.95
-            # 2      name         text    object       0.88
-            # 3      signup_date  datetime  datetime64   0.98
-        """
+        """Return Column, dtype, role, confidence, unique and uniqueness_ratio."""
         self._ensure_analyzed()
         schema = self._report["results"].get("schema", {})
         df_result = pd.DataFrame(schema).T
@@ -125,18 +132,11 @@ class NowEDAAccessor:
         return df_result.reset_index()
 
     def stats_df(self):
-        """Return descriptive statistics for numeric columns as a DataFrame.
+        """Return per-column statistics with lowercase field names.
 
-        Returns:
-            DataFrame with columns: [Column, Mean, Std, Min, Q1, Median, Q3, Max, Skewness, Kurtosis]
-                Includes statistics for all numeric columns in the dataset.
-
-        Example:
-            stats = df.eda.stats_df()
-            print(stats)
-            #      Column      Mean       Std       Min        Q1  Median    Q3       Max  Skewness  Kurtosis
-            # 0       age     45.2     15.3      18.0      34.0   45.0  58.0     85.0      -0.12      -0.45
-            # 1    salary  65000.0  25000.0  30000.0  50000.0 65000.0 80000.0 150000.0      0.85       1.20
+        Numeric fields include mean, median, std, min, max, q25, q75,
+        skewness and kurtosis. Categorical fields include top_value and top_freq.
+        Undefined numeric statistics are NaN.
         """
         self._ensure_analyzed()
         stats = self._report["results"].get("stats", {})
@@ -313,25 +313,10 @@ class NowEDAAccessor:
         return pd.DataFrame(rows)
 
     def encoding_df(self):
-        """Return detected encoding signals in data columns as a DataFrame.
+        """Return Column and Encoding_Type for possible Base64 signals.
 
-        NowEDA detects signs of encoded or obfuscated data, including:
-            - Base64-encoded strings
-            - Obfuscation patterns (e.g., 'xxxxxxxx****')
-
-        Returns:
-            DataFrame with columns: [Column, Encoding_Type]
-                - Column: Column name with detected encoding
-                - Encoding_Type: Type of encoding signal (e.g., 'base64', 'obfuscation')
-
-            Returns empty DataFrame if no encoding signals detected.
-
-        Example:
-            encoding = df.eda.encoding_df()
-            print(encoding)
-            #        Column       Encoding_Type
-            # 0  customer_id    base64_signal
-            # 1  secret_key    obfuscation
+        Detection samples up to the first 20 nonmissing values per text column.
+        It does not identify arbitrary obfuscation or return raw samples.
         """
         self._ensure_analyzed()
         encoding = self._report["results"].get("encoding", {})
@@ -436,7 +421,7 @@ class NowEDAAccessor:
                 print(f"  {col:<{col_w}} {count:>8,} {mean:>12.4g} {std:>12.4g} {mn:>10.4g} {q25:>10.4g} {med:>10.4g} {q75:>10.4g} {mx:>10.4g} {skew_str}")
 
         # Categorical / text columns
-        cat_cols = [c for c in df.columns if df[c].dtype == object or str(df[c].dtype) == "category"]
+        cat_cols = [c for c in df.columns if is_textual(df[c])]
         if cat_cols:
             try:
                 import numpy as np
@@ -579,7 +564,7 @@ class NowEDAAccessor:
                 print(f"    … and {len(transform_candidates) - 5} more")
 
         # Cardinality warnings
-        cat_cols = [c for c in df.columns if df[c].dtype == object or str(df[c].dtype) == "category"]
+        cat_cols = [c for c in df.columns if is_textual(df[c])]
         cardinality_issues = []
         for col in cat_cols:
             warning = cardinality_warning(df[col])
@@ -690,7 +675,7 @@ class NowEDAAccessor:
 
             # High cardinality check: only for object columns (credit card, email, etc)
             # Don't apply to numeric columns as continuous data naturally has high cardinality
-            if col_values.dtype == object:
+            if is_textual(col_values):
                 unique_ratio = col_values.nunique() / len(col_values) if len(col_values) > 0 else 0
                 if unique_ratio > 0.95:  # >95% unique string values likely PII/ID
                     return True
@@ -720,7 +705,7 @@ class NowEDAAccessor:
         ]
         cat_cols = [
             c for c in viz_cols
-            if (df[c].dtype == object or str(df[c].dtype) == "category")
+            if is_textual(df[c])
             and schema.get(c, {}).get("role") in ("categorical", "categorical_numeric", "text", None)
             and df[c].nunique() <= 30
         ]
@@ -1043,21 +1028,21 @@ class NowEDAAccessor:
                 import numpy as np
 
                 # Compute Cramér's V for all cat column pairs
-                cramers_matrix = np.zeros((len(cat_cols), len(cat_cols)))
+                cramers_matrix = np.full((len(cat_cols), len(cat_cols)), np.nan)
                 for i, col1 in enumerate(cat_cols):
                     for j, col2 in enumerate(cat_cols):
                         if i == j:
                             cramers_matrix[i, j] = 1.0
                         elif i < j:
                             try:
-                                v = cramers_v(df[col1].dropna(), df[col2].dropna())
+                                v = cramers_v(df[col1], df[col2])
                                 cramers_matrix[i, j] = cramers_matrix[j, i] = v
                             except Exception:
                                 pass
 
                 fig, ax = plt.subplots(figsize=(8, 6))
                 cmap = matplotlib.colormaps.get_cmap("YlOrRd") if hasattr(matplotlib, "colormaps") else plt.cm.YlOrRd
-                im = ax.imshow(cramers_matrix, cmap=cmap, aspect='auto', vmin=0, vmax=1)
+                im = ax.imshow(np.ma.masked_invalid(cramers_matrix), cmap=cmap, aspect='auto', vmin=0, vmax=1)
                 plt.colorbar(im, ax=ax, label="Cramér's V")
 
                 ax.set_xticks(range(len(cat_cols)))
@@ -1068,8 +1053,8 @@ class NowEDAAccessor:
                 # Annotate
                 for i in range(len(cat_cols)):
                     for j in range(len(cat_cols)):
-                        text = ax.text(j, i, f'{cramers_matrix[i, j]:.2f}',
-                                      ha="center", va="center", color="black" if cramers_matrix[i, j] < 0.5 else "white",
+                        text = ax.text(j, i, ('N/A' if np.isnan(cramers_matrix[i, j]) else f'{cramers_matrix[i, j]:.2f}'),
+                                      ha="center", va="center", color="black" if np.isnan(cramers_matrix[i, j]) or cramers_matrix[i, j] < 0.5 else "white",
                                       fontsize=8)
 
                 ax.set_title("Categorical Association (Cramér's V)", fontsize=13, fontweight="bold")
@@ -1082,8 +1067,12 @@ class NowEDAAccessor:
         if figs_shown == 0:
             print("No visualizations could be generated for this dataset.")
 
-    def mlall(self):
+    def mlall(self, target=None):
         """Print ML algorithm recommendations and preprocessing pipeline.
+
+        target : optional column label
+            Classification target for class-balance checks. Omit for general
+            feature recommendations without assuming a target.
 
         Provides:
           - Supervised Learning recommendations with star ratings and explanations
@@ -1107,7 +1096,7 @@ class NowEDAAccessor:
         _RESET = "\033[0m"
 
         # Build profile used by ML recommenders
-        profile = _profile(df, stats, schema, scores, results)
+        profile = _profile(df, stats, schema, scores, results, target=target)
 
         # Get recommendations
         supervised = supervised_recommendations(profile)
@@ -1204,7 +1193,7 @@ class NowEDAAccessor:
                 print(f"  Recommendation  : {_YELLOW}log1p transform strongly recommended{_RESET}")
 
         # Categorical-specific analysis
-        elif col.dtype == object or str(col.dtype) == "category":
+        elif is_textual(col):
             print(f"\n{_BOLD}Categorical Statistics:{_RESET}")
             print(f"  Top Value       : {col_stats.get('top_value', 'N/A')}")
             print(f"  Frequency       : {col_stats.get('top_freq', 'N/A')} ({col_stats.get('top_freq', 0) / len(col) * 100:.1f}%)")
@@ -1378,6 +1367,8 @@ for _method_name in (
     "insights",
     "score",
     "report",
+    "summary",
+    "refresh",
     "scores_df",
     "insights_df",
     "schema_df",

@@ -1,3 +1,4 @@
+from noweda.dtypes import is_textual
 import warnings
 
 import pandas as pd
@@ -25,12 +26,14 @@ class SchemaPlugin(BasePlugin):
             return ("datetime", 0.99)
 
         # Try to parse object columns as datetime (suppress noisy pandas warnings)
-        if dtype == "object":
+        if is_textual(series):
             sample = series.dropna().astype(str).head(20)
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
                     pd.to_datetime(sample)
+                    if sample.empty:
+                        raise ValueError("No values to infer a datetime role")
                 return ("datetime", 0.85)
             except Exception:
                 pass
@@ -48,7 +51,7 @@ class SchemaPlugin(BasePlugin):
             return ("numeric", 0.98)
 
         # Object / string
-        if dtype == "object":
+        if is_textual(series):
             # Require near-perfect uniqueness for string ID detection
             if uniqueness >= 0.98 and n_unique > 5:
                 return ("id_candidate", 0.92)

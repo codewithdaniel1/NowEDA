@@ -131,7 +131,7 @@ def test_pii_plugin_detects_email():
     df = pd.DataFrame({"email": ["user@example.com", "other@test.org", "nomail"]})
     result = PIIDetectorPlugin().run(df)
     assert "email" in result
-    assert result["email"]["emails_detected"] == 2
+    assert result["email"]["email"] == 2
 
 
 def test_html_report_creates_file(tmp_path):

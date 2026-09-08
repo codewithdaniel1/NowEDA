@@ -1,5 +1,6 @@
 """Temporal data analysis utilities."""
 
+from noweda.dtypes import is_textual
 import pandas as pd
 import numpy as np
 
@@ -21,11 +22,11 @@ def detect_temporal_columns(df):
             continue
 
         # Try parsing object columns as datetime
-        if df[col].dtype == "object":
+        if is_textual(df[col]):
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    parsed = pd.to_datetime(df[col], errors="coerce", infer_datetime_format=True)
+                    parsed = pd.to_datetime(df[col], errors="coerce")
                 # Check if >80% of values parsed successfully
                 valid_pct = parsed.notna().sum() / len(df)
                 if valid_pct > 0.8:

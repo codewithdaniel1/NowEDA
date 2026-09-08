@@ -32,7 +32,7 @@ df = eda.read("data.xlsx", sheet_name="Sales Q1")
 df = eda.read("data.csv", nrows=1000, encoding="latin-1")
 ```
 
-For very large Spark-friendly files, `eda.read()` can switch to PySpark automatically. Spark is bundled with NowEDA, so there is no extra install flag or backend setting.
+Large Parquet/ORC files (at least 128 MB) without reader options may use Spark. CSV/JSON and reads with options use pandas. The final DataFrame must fit in RAM; Spark is not guaranteed to be faster.
 
 The returned object is a **standard pandas DataFrame** — every pandas method still works:
 

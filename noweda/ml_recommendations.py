@@ -5,6 +5,7 @@ Every algorithm always appears — with a rating, data-specific reasoning,
 and concrete warnings. No hard-gating behind thresholds.
 """
 
+from noweda.dtypes import is_textual
 import numpy as np
 import pandas as pd
 
@@ -17,14 +18,23 @@ def _stars(score):
     return "★" * full + "☆" * (5 - full)
 
 
-def _profile(df, stats, schema, scores, results):
+def _profile(df, stats, schema, scores, results, target=None):
     """Build a rich data profile dict used by all recommenders."""
     missing = results.get("missing", {})
     outliers = results.get("outliers", {})
     corr = results.get("correlation", {})
 
+    if target is not None and target not in df.columns:
+        raise ValueError(f"Target column not found: {target!r}")
+    target_values = df[target] if target is not None else None
+    feature_df = df.drop(columns=[target]) if target is not None else df
+    df = feature_df
+    missing = {c: v for c, v in missing.items() if c in df.columns}
+    outliers = {c: v for c, v in outliers.items() if c in df.columns}
+    corr = {c: {other: value for other, value in values.items() if other in df.columns}
+            for c, values in corr.items() if c in df.columns}
     num_cols = [c for c in df.columns if df[c].dtype.kind in ("i", "u", "f")]
-    cat_cols = [c for c in df.columns if df[c].dtype == object or str(df[c].dtype) == "category"]
+    cat_cols = [c for c in df.columns if is_textual(df[c])]
     n_rows, n_cols = len(df), len(df.columns)
 
     # Skewness: count of highly skewed numeric cols
@@ -51,19 +61,18 @@ def _profile(df, stats, schema, scores, results):
     total_outliers = sum(outliers.values()) if outliers else 0
     outlier_heavy = total_outliers > (n_rows * 0.05)
 
-    # Class imbalance detection: check all categorical columns
+    # Only assess classes when the caller explicitly names a target.
     imbalanced_cols = {}
-    for c in cat_cols:
-        value_counts = df[c].value_counts(normalize=True)
-        if len(value_counts) > 1:
-            max_freq = value_counts.iloc[0]
-            # Imbalanced if dominant class is >70% or <30% of data
-            if max_freq > 0.70 or max_freq < 0.30:
-                imbalanced_cols[c] = max_freq
+    if target_values is not None:
+        counts = target_values.value_counts()
+        counts = counts[counts > 0]
+        if len(counts) > 1 and counts.max() / counts.min() > 2:
+            imbalanced_cols[target] = float(counts.max() / counts.sum())
 
     has_imbalance = len(imbalanced_cols) > 0
 
     return {
+        "target": target,
         "n_rows": n_rows,
         "n_cols": n_cols,
         "n_numeric": len(num_cols),
@@ -622,6 +631,8 @@ def format_recommendations(supervised, unsupervised, pipeline, profile,
 
     # ── Data Warnings ───────────────────────────────────────────────────────
     rule("⚠ Important Data Characteristics")
+    if profile.get("target") is None:
+        print("  Target class balance was not assessed. For classification, pass mlall(target='label').")
     if profile.get("has_imbalance"):
         print(f"\n  {_YELLOW}Class Imbalance Detected:{_RESET}")
         for col, freq in profile["imbalanced_cols"].items():

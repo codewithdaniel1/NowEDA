@@ -48,13 +48,21 @@ def calculate_vif(df, numeric_cols=None):
 
 
 def cramers_v(x, y):
-    """Calculate Cramér's V statistic for categorical-categorical association."""
-    confusion_matrix = pd.crosstab(x, y)
-    chi2 = ((confusion_matrix / confusion_matrix.sum().sum()) ** 2 /
-            (confusion_matrix.sum(axis=0) / confusion_matrix.sum().sum() *
-             confusion_matrix.sum(axis=1).values[:, None] / confusion_matrix.sum().sum())).sum().sum() * len(x)
-    chi2 = np.minimum(chi2, len(x) * (min(confusion_matrix.shape) - 1))
-    return np.sqrt(chi2 / (len(x) * (min(confusion_matrix.shape) - 1))) if min(confusion_matrix.shape) > 1 else 0
+    """Cramér's V from paired observations; undefined associations return NaN.
+
+    Pair by position, including when indices contain duplicate labels.
+    """
+    if len(x) != len(y):
+        raise ValueError("Cramér's V requires equally sized paired inputs")
+    pairs = pd.DataFrame({"x": pd.Series(x).reset_index(drop=True),
+                          "y": pd.Series(y).reset_index(drop=True)}).dropna()
+    observed = pd.crosstab(pairs["x"], pairs["y"]).to_numpy(dtype=float)
+    if min(observed.shape, default=0) < 2:
+        return float("nan")
+    n = observed.sum()
+    expected = np.outer(observed.sum(axis=1), observed.sum(axis=0)) / n
+    chi2 = np.sum((observed - expected) ** 2 / expected)
+    return float(np.clip(np.sqrt(chi2 / (n * (min(observed.shape) - 1))), 0, 1))
 
 
 def mutual_information(x, y, bins=10):
@@ -97,7 +105,8 @@ def get_scaling_recommendation(col):
     range_val = max_val - min_val
 
     # If range is very large or mean >> median, likely needs scaling
-    if range_val > 100 or abs(col_clean.skew()) > 1:
+    skew = col_clean.skew()
+    if range_val > 100 or (pd.notna(skew) and abs(skew) > 1):
         return "scale (StandardScaler or MinMaxScaler)"
 
     return "optional"

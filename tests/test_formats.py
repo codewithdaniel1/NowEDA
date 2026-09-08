@@ -5,6 +5,7 @@ Every test creates its own file in a tmp_path fixture so there are no
 leftover artefacts and tests are fully isolated.
 """
 import io
+from importlib.util import find_spec
 import os
 import pickle
 import warnings
@@ -92,6 +93,7 @@ class TestExcel:
         assert len(df) == 5
 
     def test_ods(self, tmp_path):
+        pytest.importorskip("odf")
         p = tmp_path / "data.ods"
         _sample_df().to_excel(p, index=False, engine="odf")
         df = read(str(p))
@@ -135,7 +137,7 @@ class TestHTML:
 
 
 class TestParquet:
-    pytest.importorskip("pyarrow", reason="pyarrow not installed")
+    pytestmark = pytest.mark.skipif(find_spec("pyarrow") is None, reason="pyarrow not installed")
 
     def test_read(self, tmp_path):
         p = tmp_path / "data.parquet"
@@ -152,7 +154,7 @@ class TestParquet:
 
 
 class TestFeather:
-    pytest.importorskip("pyarrow", reason="pyarrow not installed")
+    pytestmark = pytest.mark.skipif(find_spec("pyarrow") is None, reason="pyarrow not installed")
 
     def test_read(self, tmp_path):
         p = tmp_path / "data.feather"
@@ -209,6 +211,7 @@ class TestErrorHandling:
     def test_missing_pyarrow_raises_helpful_error(self, tmp_path, monkeypatch):
         """If pyarrow is not installed, the error message must mention the fix."""
         import builtins
+        pytest.importorskip("pyarrow")
         real_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):
@@ -238,8 +241,9 @@ class TestErrorHandling:
             read(str(p), backend="gpu")
 
     def test_auto_spark_uses_spark_for_large_supported_files(self, tmp_path, monkeypatch):
-        p = tmp_path / "data.csv"
-        _sample_df().to_csv(p, index=False)
+        p = tmp_path / "data.parquet"
+        pytest.importorskip("pyarrow")
+        _sample_df().to_parquet(p, index=False)
 
         calls = {}
 
@@ -257,12 +261,13 @@ class TestErrorHandling:
         df = read(str(p))
 
         assert calls["called"] is True
-        assert calls["ext"] == ".csv"
+        assert calls["ext"] == ".parquet"
         assert len(df) == 5
 
     def test_auto_spark_falls_back_when_spark_missing(self, tmp_path, monkeypatch):
-        p = tmp_path / "data.csv"
-        _sample_df().to_csv(p, index=False)
+        p = tmp_path / "data.parquet"
+        pytest.importorskip("pyarrow")
+        _sample_df().to_parquet(p, index=False)
 
         def missing_spark_loader(*args, **kwargs):
             raise ImportError("No module named 'pyspark'")
@@ -276,50 +281,15 @@ class TestErrorHandling:
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 5
 
-    def test_chunked_auto_spark_uses_spark_for_large_supported_files(self, tmp_path, monkeypatch):
+    def test_large_chunked_csv_preserves_pandas_options(self, tmp_path, monkeypatch):
         p = tmp_path / "data.csv"
-        _sample_df().to_csv(p, index=False)
-
-        calls = {}
-
-        def fake_chunked_loader(path, ext, chunksize, concat, **kwargs):
-            calls["called"] = True
-            calls["path"] = path
-            calls["ext"] = ext
-            calls["chunksize"] = chunksize
-            calls["concat"] = concat
-            calls["kwargs"] = kwargs
-            if concat:
-                return _sample_df()
-            return iter([_sample_df()])
-
-        monkeypatch.setattr(io_mod, "_load_chunked_with_spark", fake_chunked_loader)
+        p.write_text("id,value\n001,10\n002,20\n003,30\n")
         monkeypatch.setattr(io_mod.os.path, "getsize", lambda _: 512 * 1024 * 1024)
-        monkeypatch.setattr(io_mod, "_SPARK_AUTO_THRESHOLD_MB", 1)
-
-        df = io_mod.read_chunked(str(p), chunksize=2)
-
-        assert calls["called"] is True
-        assert calls["ext"] == ".csv"
-        assert calls["chunksize"] == 2
-        assert calls["concat"] is True
-        assert len(df) == 5
-
-    def test_chunked_auto_spark_falls_back_when_spark_missing(self, tmp_path, monkeypatch):
-        p = tmp_path / "data.csv"
-        _sample_df().to_csv(p, index=False)
-
-        def missing_spark_loader(*args, **kwargs):
-            raise ImportError("No module named 'pyspark'")
-
-        monkeypatch.setattr(io_mod, "_load_chunked_with_spark", missing_spark_loader)
-        monkeypatch.setattr(io_mod.os.path, "getsize", lambda _: 512 * 1024 * 1024)
-        monkeypatch.setattr(io_mod, "_SPARK_AUTO_THRESHOLD_MB", 1)
-
-        chunks = list(io_mod.read_chunked(str(p), chunksize=2, concat=False))
-
-        assert len(chunks) == 3
-        assert all(isinstance(chunk, pd.DataFrame) for chunk in chunks)
+        chunks = list(noweda.read_chunked(p, chunksize=2, concat=False,
+                                         dtype={"id": str}, usecols=["id"]))
+        assert [len(chunk) for chunk in chunks] == [2, 1]
+        assert pd.concat(chunks)["id"].tolist() == ["001", "002", "003"]
+        assert all(list(chunk.columns) == ["id"] for chunk in chunks)
 
 
 # ===========================================================================

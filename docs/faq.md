@@ -50,25 +50,14 @@ import noweda as eda   # this line is required
 
 **Q: I updated a column and re-ran `df.noweda.insights()` — it returned the same old results. Why?**
 
-The accessor caches results after the first call. To re-run analysis on modified data, either:
+Since 0.1.3, changes to DataFrame values and schema automatically invalidate the
+cached report. You can also explicitly force a new analysis:
 
-1. Run analysis on the modified DataFrame as a new object:
-    ```python
-    df["col"] = df["col"].fillna(0)
-    df.noweda.score()   # stale — used original df
-    
-    df2 = df.copy()
-    df2.noweda.score()  # fresh — new accessor instance
-    ```
-
-2. Or call `engine.run_df()` directly without caching:
-    ```python
-    from noweda.core.engine import AutoEDAEngine
-    from noweda.plugins import default_plugins
-    
-    engine = AutoEDAEngine(default_plugins())
-    report = engine.run_df(df)   # always fresh, no cache
-    ```
+```python
+df["col"] = df["col"].fillna(0)
+df.noweda.score()       # reflects the modified values
+report = df.noweda.refresh()
+```
 
 ---
 
@@ -86,7 +75,7 @@ df = eda.read("data.txt", sep="\t")
 
 **Q: How does NowEDA handle very large files?**
 
-`eda.read()` automatically uses Spark for large supported files, and `eda.read_chunked()` can also use Spark when chunked loading makes sense. You still get pandas DataFrames back, but the load step is faster and the UI shows progress while the work is running.
+Large Parquet/ORC files (at least 128 MB) without reader options may use Spark. CSV/JSON and reads with options use pandas. The final DataFrame must fit in RAM; Spark is not guaranteed to be faster. For files that do not fit in memory, use `read_chunked(..., concat=False)` on CSV or line-delimited JSON.
 
 ---
 

@@ -1,3 +1,4 @@
+from noweda.dtypes import is_textual
 import re
 from .base import BasePlugin
 
@@ -24,7 +25,7 @@ class PIIDetectorPlugin(BasePlugin):
         findings = {}
 
         for col in df.columns:
-            if df[col].dtype != "object":
+            if not is_textual(df[col]):
                 continue
 
             # Drop NaN values and convert to string

@@ -19,7 +19,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install mkdocs mkdocs-material mkdocs-autorefs
+        run: pip install 'mkdocs<2' mkdocs-material mkdocs-autorefs
 
       - name: Deploy to GitHub Pages
         run: mkdocs gh-deploy --force

@@ -2,85 +2,63 @@ name: Publish Package to PyPI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
   publish:
+    needs: checks
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-
-      - name: Read package version
-        id: version
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-          import os
-
-          text = Path("pyproject.toml").read_text()
-          match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
-          if not match:
-              raise SystemExit("Could not find version in pyproject.toml")
-
-          version = match.group(1)
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
-              print(f"version={version}", file=handle)
-          PY
-
-      - name: Check whether this version is already on PyPI
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist
+      - name: Check release version and publication status
         id: pypi
         run: |
           python - <<'PY'
           import json
           import os
+          import runpy
           import urllib.error
           import urllib.request
+          import zipfile
+          from email.parser import BytesParser
+          from pathlib import Path
 
-          package_name = "noweda"
-          version = "${{ steps.version.outputs.version }}"
-          published = False
-
+          version = runpy.run_path("noweda/_version.py")["__version__"]
+          wheel, = Path("dist").glob("*.whl")
+          with zipfile.ZipFile(wheel) as archive:
+              metadata, = [n for n in archive.namelist() if n.endswith(".dist-info/METADATA")]
+              assert BytesParser().parsebytes(archive.read(metadata))["Version"] == version
           try:
-              with urllib.request.urlopen(f"https://pypi.org/pypi/{package_name}/json", timeout=20) as response:
-                  data = json.load(response)
-              published = version in data.get("releases", {})
+              with urllib.request.urlopen(f"https://pypi.org/pypi/noweda/{version}/json", timeout=20) as response:
+                  json.load(response)
+              published = True
           except urllib.error.HTTPError as exc:
               if exc.code != 404:
                   raise
-          except Exception as exc:
-              print(f"Warning: could not query PyPI ({exc}); proceeding with publish.")
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
-              print(f"published={'true' if published else 'false'}", file=handle)
+              published = False
+          with open(os.environ["GITHUB_OUTPUT"], "a") as handle:
+              print(f"published={str(published).lower()}", file=handle)
           PY
-
-      - name: Skip publish
-        if: steps.pypi.outputs.published == 'true'
-        run: echo "Version ${{ steps.version.outputs.version }} is already on PyPI, so publishing is skipped."
-
-      - name: Install build tools
+      - name: Install publishing tools
         if: steps.pypi.outputs.published != 'true'
-        run: python -m pip install --upgrade build twine
-
-      - name: Build distribution
-        if: steps.pypi.outputs.published != 'true'
-        run: python -m build
-
-      - name: Publish to PyPI
+        run: python -m pip install twine
+      - name: Publish checked distributions
         if: steps.pypi.outputs.published != 'true'
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: python -m twine upload dist/*
+        run: python -m twine upload --non-interactive dist/*

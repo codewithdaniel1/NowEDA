@@ -53,8 +53,8 @@ if encoding:
 
 ```
 PII DETECTED:
-  Column 'contact_email': {'emails_detected': 842}
-  Column 'notes': {'emails_detected': 37}
+  Column 'contact_email': {'email': 842}
+  Column 'notes': {'email': 37}
 
 ENCODING DETECTED:
   Column 'payload': possible_base64

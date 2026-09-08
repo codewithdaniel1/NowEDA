@@ -148,25 +148,11 @@ engine = AutoEDAEngine([NegativeValuePlugin()])
 report = engine.run_df(df)
 ```
 
-### Option C — Use with `df.noweda.*`
+### Custom plugins and the accessor
 
-Monkey-patch the default plugin list before analysis runs:
-
-```python
-import noweda.plugins as _plugins
-from my_plugins import NegativeValuePlugin
-
-original_defaults = _plugins.default_plugins
-
-def patched_defaults():
-    return original_defaults() + [NegativeValuePlugin()]
-
-_plugins.default_plugins = patched_defaults
-
-# Now df.noweda.* uses your extended plugin list
-df = eda.read("data.csv")
-print(df.noweda.summary()["negatives"])
-```
+The accessor uses the built-in plugin set. For a custom set, use
+`AutoEDAEngine([...]).run_df(df)` as shown above. This avoids changing global
+plugin state and gives you an explicit report for the selected plugins.
 
 ---
 

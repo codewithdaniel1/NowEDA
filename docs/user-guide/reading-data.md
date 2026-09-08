@@ -14,9 +14,9 @@ df = eda.read("path/to/file.csv")
 
 All `**kwargs` are forwarded directly to the underlying pandas reader, so every option you know from `pd.read_csv`, `pd.read_excel`, etc. works exactly the same way.
 
-For large Spark-friendly files, `eda.read()` can route through PySpark automatically when the file is big enough. Spark ships with NowEDA, so no extra flag or install step is needed.
+Large Parquet/ORC files (at least 128 MB) without reader options may use Spark. CSV/JSON and reads with options use pandas. The final DataFrame must fit in RAM; Spark is not guaranteed to be faster.
 
-`eda.read_chunked()` follows the same idea for chunked CSV and JSON files: Spark is used automatically when it can help, and pandas chunks are still returned to your code.
+`eda.read_chunked()` always uses pandas. Use `concat=False` to iterate within bounded memory; the default `concat=True` retains all chunks and allocates a combined DataFrame.
 
 ---
 
@@ -85,7 +85,7 @@ For large Spark-friendly files, `eda.read()` can route through PySpark automatic
     df = eda.read("data.xlsx", usecols=[0, 1, 4])
     ```
 
-    File extensions recognized: `.xlsx`, `.xlsm`, `.xlsb`
+    File extensions recognized: `.xlsx`, `.xlsm`, `.xlsb`. For `.xlsb`, install `noweda[excel]`.
 
 === "Legacy Excel (.xls)"
 
@@ -104,7 +104,7 @@ For large Spark-friendly files, `eda.read()` can route through PySpark automatic
     df = eda.read("data.odt")
     ```
 
-    Requires `odfpy`: `pip install odfpy`
+    Requires `odfpy`: `pip install "noweda[excel]"`
 
 ---
 
@@ -320,8 +320,9 @@ eda.read("data.parquet")
 | `.csv` | Comma-separated values | — |
 | `.tsv` `.tab` | Tab-separated values | — |
 | `.txt` | Plain text (assumed CSV) | — |
-| `.xlsx` `.xlsm` `.xlsb` | Excel (modern) | — |
-| `.xls` | Excel (legacy) | — |
+| `.xlsx` `.xlsm` | Excel (modern) | — |
+| `.xlsb` | Excel binary | `noweda[excel]` |
+| `.xls` | Excel (legacy) | `noweda[excel]` |
 | `.ods` `.odf` `.odt` | OpenDocument spreadsheet | `odfpy` |
 | `.json` `.jsonl` | JSON / JSON Lines | — |
 | `.xml` | XML | `lxml` (auto-installed) |

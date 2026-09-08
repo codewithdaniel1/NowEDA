@@ -1,3 +1,4 @@
+from noweda.dtypes import is_textual
 import base64
 from .base import BasePlugin
 
@@ -14,7 +15,7 @@ class EncodingDetectionPlugin(BasePlugin):
         results = {}
 
         for col in df.columns:
-            if df[col].dtype == "object":
+            if is_textual(df[col]):
                 sample = df[col].dropna().astype(str).head(20)
                 count = sum(self.is_base64(x) for x in sample)
 

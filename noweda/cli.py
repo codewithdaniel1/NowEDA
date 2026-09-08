@@ -1,3 +1,4 @@
+from noweda.dtypes import is_textual
 import argparse
 import json
 from noweda import read
@@ -103,7 +104,7 @@ def main():
             print(f"  {col:<{col_w}} {count:>8,} {mean:>12.4g} {std:>12.4g} {mn:>10.4g} {q25:>10.4g} {med:>10.4g} {q75:>10.4g} {mx:>10.4g} {skew_s}")
 
     # ── Categorical Stats ─────────────────────────────────────────────────────
-    cat_cols = [c for c in df.columns if df[c].dtype == object or str(df[c].dtype) == "category"]
+    cat_cols = [c for c in df.columns if is_textual(df[c])]
     if cat_cols:
         print(f"\n{_BOLD}Categorical Statistics{_RESET}\n{thin}")
         print(f"  {'Column':<{col_w}} {'Count':>8} {'Unique':>8} {'Top Value':<30} {'Freq':>8}")

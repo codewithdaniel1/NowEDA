@@ -3,8 +3,8 @@ NowEDA file ingestion layer.
 
 Supports all major tabular data formats. Optional formats (Parquet, Feather,
 ORC, HDF5, SPSS) require additional dependencies — a clear error is raised if
-the dependency is missing. For large Spark-friendly inputs, Spark is used
-automatically while still returning a pandas DataFrame.
+the dependency is missing. Large Parquet/ORC files without reader options may use Spark. Delimited
+text, JSON, and all chunked reads use pandas for consistent parsing.
 """
 
 import os
@@ -19,21 +19,23 @@ from noweda.ui import loading
 def read(file_path, **kwargs):
     """
     Load any supported file into a pandas DataFrame.
-    Large Spark-friendly files are routed through Spark automatically when it
-    helps performance, but the returned object is always a pandas DataFrame.
+    Large Parquet/ORC files without reader options may use Spark. The final
+    DataFrame must fit in memory. CSV/JSON and reads with options use pandas.
 
     Supported formats
     -----------------
     No extra deps required:
         .csv  .tsv  .tab  .txt       — delimited text
-        .xlsx .xls  .xlsm .xlsb
-        .ods  .odf  .odt             — spreadsheets
-        .json                        — JSON
+        .xlsx .xlsm                  — spreadsheets
+        .json .jsonl                 — JSON and JSON Lines
         .xml                         — XML
         .html .htm                   — HTML table
         .dta                         — Stata
         .sas7bdat .xpt               — SAS
         .pkl .pickle                 — Python pickle
+
+    Requires `pip install "noweda[excel]"`:
+        .xls .xlsb .ods .odf .odt    — additional spreadsheet formats
 
     Requires `pip install noweda[parquet]`  (pyarrow):
         .parquet  .feather  .orc
@@ -70,7 +72,7 @@ def read(file_path, **kwargs):
         raise FileNotFoundError(f"File not found: {file_path}")
 
     with loading(f"NowEDA · Reading {os.path.basename(file_path)}"):
-        if _should_use_spark(file_path, ext):
+        if not kwargs and _should_use_spark(file_path, ext):
             try:
                 return _load_with_spark(file_path, ext, **dict(kwargs))
             except Exception:
@@ -83,9 +85,10 @@ def read(file_path, **kwargs):
 
 def read_chunked(file_path, chunksize=10_000, concat=True, **kwargs):
     """
-    Read a large CSV or JSON file in chunks to avoid loading it all into memory.
+    Read a CSV or line-delimited JSON file in chunks.
 
-    This is useful for files larger than available RAM. Pandas natively supports
+    Use concat=False for bounded-memory iteration; concat=True retains all chunks
+    and allocates a combined DataFrame. Pandas natively supports
     chunked reading via the `chunksize` parameter for CSV and JSON files.
 
     Supported formats for chunked reading
@@ -150,21 +153,8 @@ def read_chunked(file_path, chunksize=10_000, concat=True, **kwargs):
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
 
-    use_spark = _should_use_spark(file_path, ext)
-
-    if use_spark:
-        try:
-            return _load_chunked_with_spark(
-                file_path,
-                ext,
-                chunksize=chunksize,
-                concat=concat,
-                **dict(kwargs),
-            )
-        except Exception:
-            # Fall back to pandas chunking if Spark is unavailable or the
-            # Spark path cannot handle the provided input/options.
-            pass
+    if isinstance(chunksize, bool) or not isinstance(chunksize, int) or chunksize <= 0:
+        raise ValueError("chunksize must be a positive integer")
 
     def _pandas_iterator():
         if ext in (".csv", ".tsv", ".tab", ".txt"):
@@ -217,24 +207,6 @@ def _load_with_spark(path, ext, **kw):
     return spark_df.toPandas()
 
 
-def _load_chunked_with_spark(path, ext, chunksize, concat, **kw):
-    """Load a chunked Spark-friendly file via Spark and batch into pandas chunks."""
-    spark_df = _spark_dataframe(path, ext, **kw)
-    iterator = _spark_chunk_iterator(spark_df, chunksize)
-    message = f"NowEDA · Reading {os.path.basename(path)} in chunks"
-
-    if concat:
-        with loading(message):
-            return pd.concat(list(iterator), ignore_index=True)
-
-    def _chunk_generator():
-        with loading(message):
-            for chunk in iterator:
-                yield chunk
-
-    return _chunk_generator()
-
-
 def _spark_dataframe(path, ext, **kw):
     """Return a Spark DataFrame for Spark-friendly file formats."""
     try:
@@ -247,18 +219,6 @@ def _spark_dataframe(path, ext, **kw):
 
     spark = SparkSession.builder.appName("NowEDA").getOrCreate()
 
-    if ext in (".csv", ".tsv", ".tab", ".txt"):
-        if ext in (".tsv", ".tab"):
-            kw.setdefault("sep", "\t")
-        kw.setdefault("header", True)
-        kw.setdefault("inferSchema", True)
-        return spark.read.options(**kw).csv(path)
-
-    if ext in (".json", ".jsonl"):
-        kw.pop("lines", None)
-        kw.setdefault("multiLine", False)
-        return spark.read.options(**kw).json(path)
-
     if ext == ".parquet":
         return spark.read.options(**kw).parquet(path)
 
@@ -269,21 +229,6 @@ def _spark_dataframe(path, ext, **kw):
         f"Spark reader does not support '{ext}'. "
         "Use the pandas reader for this format."
     )
-
-
-def _spark_chunk_iterator(spark_df, chunksize):
-    """Yield pandas DataFrames from a Spark DataFrame in fixed-size batches."""
-    columns = list(spark_df.columns)
-    batch = []
-
-    for row in spark_df.toLocalIterator():
-        batch.append(row.asDict(recursive=True))
-        if len(batch) >= chunksize:
-            yield pd.DataFrame.from_records(batch, columns=columns)
-            batch = []
-
-    if batch:
-        yield pd.DataFrame.from_records(batch, columns=columns)
 
 
 # -- loaders -----------------------------------------------------------------
@@ -298,10 +243,18 @@ def _load_tsv(path, **kw):
 
 
 def _load_excel(path, **kw):
+    if "engine" not in kw:
+        requirements = {".xls": "xlrd", ".xlsb": "pyxlsb", ".ods": "odf",
+                        ".odf": "odf", ".odt": "odf"}
+        package = requirements.get(_extension(path))
+        if package:
+            _require(package, "excel", _extension(path))
     return pd.read_excel(path, **kw)
 
 
 def _load_json(path, **kw):
+    if _extension(path) == ".jsonl":
+        kw.setdefault("lines", True)
     return pd.read_json(path, **kw)
 
 
@@ -373,7 +326,7 @@ _CHUNKED_FORMATS = {".csv", ".tsv", ".tab", ".txt", ".json", ".jsonl"}
 # Formats that can be accelerated by Spark
 # ---------------------------------------------------------------------------
 
-_SPARK_FORMATS = {".csv", ".tsv", ".tab", ".txt", ".parquet", ".orc"}
+_SPARK_FORMATS = {".parquet", ".orc"}
 
 # Default file-size threshold for Spark auto-routing.
 _SPARK_AUTO_THRESHOLD_MB = 128

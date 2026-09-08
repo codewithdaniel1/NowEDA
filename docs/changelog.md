@@ -4,6 +4,27 @@ All notable changes to NowEDA are documented here.
 
 ---
 
+## [0.1.3] — 2026-09-08
+
+### Fixed
+
+- PII, encoding, schema and categorical analysis support pandas string and categorical dtypes, including pandas 3 defaults.
+- Cached reports refresh after DataFrame values or schema change; `refresh()` forces a new report.
+- Cramér's V uses paired observations and the Pearson chi-square formula; undefined heatmap entries display N/A.
+- Nullable numeric statistics no longer crash on undefined reductions; kurtosis is included.
+- JSONL files default to line-delimited parsing.
+- Restored `summary()` and exposed `__version__`.
+- Corrected README bold labels, installation instructions, table schemas and image URLs.
+
+### Changed
+
+- `mlall(target="label")` checks the named classification target only. No target means no class-balance assessment. Imbalance means a largest/smallest observed class count ratio greater than 2.
+- CSV/JSON and all chunked reads use pandas for consistent parsing. Automatic Spark routing is limited to large Parquet/ORC files without reader options.
+- Added `excel`, `viz`, `ml`, and `test` extras; `full` includes every optional runtime feature.
+- Release builds require tests and package checks before publication.
+
+---
+
 ## [0.1.2] — 2026-04-20
 
 ### Changed
@@ -73,8 +94,5 @@ All notable changes to NowEDA are documented here.
 
 Features planned for future releases:
 
-- Visualisation layer (histograms, correlation heatmap, distribution plots)
-- Additional PII patterns (phone numbers, SSNs, credit card numbers)
-- Dataset fingerprinting (hash-based change detection)
 - conda-forge package
 - Web dashboard UI

@@ -36,7 +36,7 @@ df = eda.read("data.xlsx", sheet_name="Q1")
 df = eda.read("data.csv", nrows=500, encoding="latin-1")
 ```
 
-Large Spark-friendly files are routed through Spark automatically when possible, and the notebook/CLI UI shows a loading indicator while work is in progress.
+Large Parquet/ORC files (at least 128 MB) without reader options may use Spark. CSV/JSON and reads with options use pandas. The final DataFrame must fit in RAM; Spark is not guaranteed to be faster.
 
 ---
 
@@ -62,7 +62,7 @@ df.noweda.insights() → List[str]
 
 Returns a list of human-readable, actionable insight strings.
 
-Analysis runs on first call and is cached. Subsequent calls return immediately.
+Analysis runs on first call and is cached. Subsequent calls scan a fingerprint of the data and schema, reusing the report only if they have not changed.
 
 ---
 
@@ -160,9 +160,32 @@ Auto-renders the best visualizations for your dataset based on column types:
 | Missing value bar chart | When any column has missing values |
 | Time-series line plot | When datetime + numeric columns both exist |
 
-Requires `matplotlib` (`pip install matplotlib`). KDE overlay additionally requires `scipy`.
+Install `noweda[viz]` for Matplotlib charts and SciPy KDE overlays.
 
 Returns `None`; charts are rendered inline (Jupyter) or displayed in a window (terminal).
+
+---
+
+### `df.noweda.refresh()`
+
+Forces fresh analysis and returns the complete report dictionary.
+
+### `df.noweda.mlall(target=None)`
+
+Prints heuristic model and preprocessing recommendations. For classification,
+pass the target column label, e.g. `df.noweda.mlall(target="segment")`. The target
+is excluded from feature diagnostics. An observed largest/smallest class count
+ratio greater than 2 triggers a class-balance warning. Numeric labels are allowed;
+omit the target for regression guidance without class-balance checks. Without a
+target, no class-balance check is performed.
+
+### Table schemas
+
+`schema_df()` returns `Column`, `dtype`, `role`, `confidence`, `unique`, and
+`uniqueness_ratio`. `stats_df()` includes all columns, with numeric fields
+`mean`, `median`, `std`, `min`, `max`, `q25`, `q75`, `skewness`, and `kurtosis`,
+and categorical fields `top_value` and `top_freq` where applicable.
+`encoding_df()` returns `Column` and `Encoding_Type` with possible Base64 signals.
 
 ---
 

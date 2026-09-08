@@ -24,19 +24,19 @@ df2.noweda.insights()             # also works
 
 ## Lazy Evaluation
 
-NowEDA does **not** run analysis when you load data. Analysis is deferred until you first call a `df.noweda.*` method. The result is then **cached** on the accessor instance, so subsequent calls are instant.
+NowEDA does **not** run analysis when you load data. Analysis is deferred until you first call a `df.noweda.*` method. The result is then **cached** on the accessor instance, and reused after a fingerprint check of values and schema. This check scans the data; changes trigger fresh analysis.
 
 ```python
 df = eda.read("data.csv")         # no analysis runs here
 
 df.noweda.score()                  # analysis runs here (first call)
-df.noweda.insights()               # instant — uses the cache
-df.noweda.summary()                # instant — uses the cache
-df.noweda.report()                 # instant — uses the cache
+df.noweda.insights()               # checks for changes, then reuses the cache
+df.noweda.summary()                # checks for changes, then reuses the cache
+df.noweda.report()                 # checks for changes, then reuses the cache
 ```
 
 !!! note "Cache lifetime"
-    The cache lives on the accessor instance, which is tied to the DataFrame object. If you create a new DataFrame (e.g. by filtering or copying), the new object has no cache and will re-run analysis on first access.
+    The cache lives on the DataFrame object and is shared by its `eda` and `noweda` accessors. If you create a new DataFrame (e.g. by filtering or copying), the new object has no cache and will re-run analysis on first access.
 
     ```python
     df_filtered = df[df["amount"] > 1000]
@@ -304,3 +304,8 @@ print(report["results"]["pii"])
 ```
 
 This is useful when you only care about specific checks (e.g. a quick PII scan before sharing data externally).
+
+### Force a fresh report
+
+`df.noweda.refresh()` reruns analysis explicitly. In-place DataFrame changes are
+also detected automatically by subsequent analysis calls.

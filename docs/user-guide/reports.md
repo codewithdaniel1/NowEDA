@@ -184,7 +184,7 @@ PII findings per column.
 ```python
 {
     "email": {
-        "emails_detected": 17    # number of email pattern matches
+        "email": 17    # number of email pattern matches
     }
 }
 ```

@@ -17,7 +17,7 @@ The PII (Personally Identifiable Information) Detection plugin scans string colu
 ```python
 {
     "email": {
-        "emails_detected": 17    # count of matching values in this column
+        "email": 17    # count of matching values in this column
     }
 }
 ```
@@ -162,7 +162,7 @@ plugin = PIIDetectorPlugin()
 result = plugin.run(df)
 
 print(result)
-# {'email': {'emails_detected': 2}, 'comment': {'emails_detected': 1}}
+# {'email': {'email': 2}, 'comment': {'email': 1}}
 ```
 
 ---
