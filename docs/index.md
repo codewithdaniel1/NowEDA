@@ -2,6 +2,8 @@
 
 **Automated Exploratory Data Analysis — built as a native pandas extension with Spark acceleration built in.**
 
+[![PyPI version](https://img.shields.io/pypi/v/noweda?label=PyPI)](https://pypi.org/project/noweda/)
+
 NowEDA profiles pandas DataFrames with heuristic quality scores, pattern-based PII detection, outlier analysis, correlations and readable insights. Use `df.noweda` or the equivalent `df.eda` accessor. Large Parquet/ORC files (at least 128 MB) without reader options may use Spark. CSV/JSON and reads with options use pandas. The final DataFrame must fit in RAM; Spark is not guaranteed to be faster.
 
 ---
