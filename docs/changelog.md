@@ -4,7 +4,7 @@ All notable changes to NowEDA are documented here.
 
 ---
 
-## [0.2.1] — Unreleased
+## [0.2.1] — 2026-09-12
 
 ### Fixed
 
