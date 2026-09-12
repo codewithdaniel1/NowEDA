@@ -9,19 +9,22 @@ Complete reference for all public functions and classes in NowEDA.
 ```python
 import noweda as eda
 
-eda.read(file_path, **kwargs) → pandas.DataFrame
+eda.read(file_path, mode="small", chunksize=100_000, **kwargs) → pandas.DataFrame | LargeDataset
 ```
 
-Load any supported file into a pandas DataFrame.
+Load a supported file into a pandas DataFrame, or explicitly create a
+disk-backed `LargeDataset`.
 
 **Parameters:**
 
 | Parameter | Type | Description |
 |---|---|---|
 | `file_path` | `str` | Path to the data file |
+| `mode` | `"small"` or `"large"` | `small` loads pandas; `large` keeps CSV, TSV, TXT, and Parquet data on disk |
+| `chunksize` | `int` | Bounded sample size used by large-mode exploratory methods |
 | `**kwargs` | any | Forwarded to the underlying pandas reader |
 
-**Returns:** `pandas.DataFrame`
+**Returns:** `pandas.DataFrame` in small mode, or `LargeDataset` in large mode.
 
 **Raises:**
 - `ValueError` — Unsupported file extension
@@ -36,7 +39,15 @@ df = eda.read("data.xlsx", sheet_name="Q1")
 df = eda.read("data.csv", nrows=500, encoding="latin-1")
 ```
 
-Large Parquet/ORC files (at least 128 MB) without reader options may use Spark. CSV/JSON and reads with options use pandas. The final DataFrame must fit in RAM; Spark is not guaranteed to be faster.
+Large mode supports `statsall()`, `report()`, `vizall()`, `mlall()`,
+`profile_column()`, and `compare()` through `data.eda`. It calculates source
+dimensions exactly, and prints a sample-size notice before every exploratory,
+sample-based result.
+
+```python
+data = eda.read("data.csv", mode="large", chunksize=100_000)
+data.eda.statsall()
+```
 
 ---
 

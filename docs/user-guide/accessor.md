@@ -4,6 +4,25 @@ The `df.noweda` accessor is a [pandas extension accessor](https://pandas.pydata.
 
 ---
 
+## Start with these methods
+
+Most analysts only need this small workflow:
+
+| Need | Method |
+|---|---|
+| Complete data assessment | `df.noweda.statsall()` |
+| Charts | `df.noweda.vizall()` |
+| ML guidance after choosing an outcome | `df.noweda.mlall(target="outcome")` |
+| Investigate one field | `df.noweda.profile_column("column")` |
+| Compare two dataset versions | `df.noweda.compare(other_df)` |
+| Use results in code or exports | `df.noweda.report()` |
+
+The individual `*_df()` methods, raw results, cache controls, and custom engines
+remain available for dashboards, tests, and platform work. They are advanced
+tools, not required for ordinary EDA.
+
+---
+
 ## How It Works
 
 When you `import noweda as eda`, the accessor is registered globally on the `pandas.DataFrame` class. This means it's available on **any** DataFrame — not just ones loaded with `eda.read()`.

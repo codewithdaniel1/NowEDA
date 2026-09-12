@@ -22,7 +22,7 @@ import noweda as eda
 df = eda.read("data.csv")
 df = eda.read("data.xlsx")
 df = eda.read("data.json")
-df = eda.read("data.parquet")  # requires: pip install "noweda[parquet]"
+df = eda.read("data.parquet")
 ```
 
 `**kwargs` are forwarded directly to the underlying pandas reader:
@@ -32,7 +32,18 @@ df = eda.read("data.xlsx", sheet_name="Sales Q1")
 df = eda.read("data.csv", nrows=1000, encoding="latin-1")
 ```
 
-Large Parquet/ORC files (at least 128 MB) without reader options may use Spark. CSV/JSON and reads with options use pandas. The final DataFrame must fit in RAM; Spark is not guaranteed to be faster.
+Small mode returns a pandas DataFrame and therefore requires the full file to
+fit in memory. Use explicit large mode below when the source should stay on disk.
+
+Use explicit large mode for CSV, TSV, TXT, and Parquet files that should stay
+on disk. It keeps the core `.eda` workflow while clearly marking exploratory
+results as sample-based:
+
+```python
+data = eda.read("data.csv", mode="large", chunksize=100_000)
+data.eda.statsall()
+data.eda.mlall(target="fraud_flag")
+```
 
 The returned object is a **standard pandas DataFrame** — every pandas method still works:
 
@@ -49,7 +60,25 @@ df.groupby("category").mean()
 
 The `df.noweda` accessor is available on every DataFrame after importing noweda.
 
-### Get human-readable insights
+### Start with one complete assessment
+
+```python
+df.noweda.statsall()
+```
+
+This is the primary starting point: it combines data quality, schema roles,
+statistics, privacy signals, temporal findings, and practical preparation steps.
+
+### Add charts when they answer the next question
+
+```python
+df.noweda.vizall()
+```
+
+Install `noweda[viz]` for charts. Use `profile_column("column_name")` when a
+single field needs deeper inspection.
+
+### Advanced: extract insight strings
 
 ```python
 for insight in df.noweda.insights():
@@ -65,7 +94,7 @@ Data quality score is acceptable (77). Minor issues present.
 Moderate risk level (25). Review PII and encoded columns before sharing.
 ```
 
-### Get scores
+### Advanced: extract the scorecard
 
 ```python
 print(df.noweda.score())
@@ -79,7 +108,7 @@ print(df.noweda.score())
 }
 ```
 
-### Get the full plugin results
+### Advanced: inspect raw plugin results
 
 ```python
 summary = df.noweda.summary()
@@ -94,7 +123,7 @@ summary["pii"]          # PII findings
 summary["encoding"]     # encoding detection results
 ```
 
-### Get everything at once
+### Advanced: use the structured report in code
 
 ```python
 report = df.noweda.report()

@@ -1,10 +1,9 @@
 """
 NowEDA file ingestion layer.
 
-Supports all major tabular data formats. Optional formats (Parquet, Feather,
-ORC, HDF5, SPSS) require additional dependencies — a clear error is raised if
-the dependency is missing. Large Parquet/ORC files without reader options may use Spark. Delimited
-text, JSON, and all chunked reads use pandas for consistent parsing.
+Supports all major tabular data formats. Parquet, Feather, and ORC are included
+in the standard install; HDF5 and SPSS retain optional dependencies. Explicit
+``mode='large'`` creates a disk-backed dataset for supported large-file formats.
 """
 
 import os
@@ -17,11 +16,11 @@ from noweda.ui import loading
 # Public API
 # ---------------------------------------------------------------------------
 
-def read(file_path, **kwargs):
+def read(file_path, mode="small", chunksize=100_000, **kwargs):
     """
-    Load any supported file into a pandas DataFrame.
-    Large Parquet/ORC files without reader options may use Spark. The final
-    DataFrame must fit in memory. CSV/JSON and reads with options use pandas.
+    Load a supported file into a pandas DataFrame, or create a disk-backed
+    large-mode dataset.
+    Small mode returns a pandas DataFrame, which must fit in memory.
 
     Supported formats
     -----------------
@@ -38,7 +37,7 @@ def read(file_path, **kwargs):
     Requires `pip install "noweda[excel]"`:
         .xls .xlsb .ods .odf .odt    — additional spreadsheet formats
 
-    Requires `pip install noweda[parquet]`  (pyarrow):
+    Included with `pip install noweda` (pyarrow):
         .parquet  .feather  .orc
 
     Requires `pip install noweda[hdf]`  (tables):
@@ -51,14 +50,30 @@ def read(file_path, **kwargs):
     ----------
     file_path : str
         Path to the data file.
+    mode : {"small", "large"}, default "small"
+        ``small`` loads the full file into a pandas DataFrame. ``large`` keeps
+        CSV, TSV, TXT, and Parquet sources on disk and returns a ``LargeDataset``
+        with the same ``.eda`` workflow for its supported methods. Large-mode
+        exploratory results are explicitly labelled sample-based.
+    chunksize : int, default 100_000
+        Maximum rows used for each large-mode exploratory sample.
     **kwargs
         Forwarded directly to the underlying pandas reader
         (e.g. sheet_name='Sheet1' for Excel, sep='|' for custom CSV).
 
     Returns
     -------
-    pandas.DataFrame
+    pandas.DataFrame or noweda.large.LargeDataset
     """
+    if mode not in {"small", "large"}:
+        raise ValueError("mode must be either 'small' or 'large'")
+
+    if mode == "large":
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+        from noweda.large import LargeDataset
+        return LargeDataset(file_path, chunksize=chunksize, **kwargs)
+
     ext = _extension(file_path)
     loader = _LOADERS.get(ext)
 
@@ -312,9 +327,10 @@ def _require(package, extra, fmt):
     try:
         __import__(package)
     except ImportError:
+        install = "pip install noweda" if package == "pyarrow" else f"pip install noweda[{extra}]"
         raise ImportError(
             f"Reading {fmt} files requires '{package}'.\n"
-            f"Install it with:  pip install noweda[{extra}]"
+            f"Install it with:  {install}"
         ) from None
 
 

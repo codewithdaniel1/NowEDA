@@ -62,8 +62,8 @@ def main():
     dq   = scores.get("data_quality", "N/A")
     mr   = scores.get("model_readiness", "N/A")
     risk = scores.get("risk", "N/A")
-    print(f"  Data Quality    : {_score_color(dq)} / 100")
-    print(f"  Model Readiness : {_score_color(mr)} / 100")
+    print(f"  Data Quality    : {_score_color(dq)} out of 100")
+    print(f"  Model Readiness : {_score_color(mr)} out of 100")
     risk_col = f"{_RED}{risk}{_RESET}" if isinstance(risk, (int, float)) and risk > 0 else f"{_GREEN}{risk}{_RESET}"
     print(f"  Risk            : {risk_col}  (0 = no risk)")
 

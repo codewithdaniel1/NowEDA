@@ -12,6 +12,8 @@ NowEDA's core dependencies are installed automatically:
 | `pandas` | ≥ 1.3 | DataFrame engine |
 | `numpy` | ≥ 1.21 | Numeric computation |
 | `pyspark` | ≥ 3.4 | Spark-backed ingestion for large files |
+| `duckdb` | ≥ 1.1 | Disk-backed large-mode analytics |
+| `pyarrow` | ≥ 14 | Columnar file support and interchange |
 | `openpyxl` | ≥ 3.1 | Excel (.xlsx) reading |
 | `lxml` | ≥ 4.6 | XML and HTML parsing |
 
@@ -24,8 +26,9 @@ pip install noweda
 ```
 
 This gives you full support for:
-CSV, TSV, XLSX/XLSM, JSON/JSONL, XML, HTML, Stata, SAS and Pickle.
-Large Parquet/ORC files without reader options may use Spark; the final DataFrame must fit in RAM.
+CSV, TSV, XLSX/XLSM, JSON/JSONL, XML, HTML, Stata, SAS, Pickle, Parquet,
+Feather, and ORC. Explicit `mode="large"` keeps CSV, TSV, TXT, and Parquet
+sources on disk for the supported `.eda` workflow.
 
 ---
 
@@ -40,14 +43,6 @@ pip install "noweda[ml]"     # Statsmodels and scikit-learn diagnostics
 ```
 
 Install other formats as extras:
-
-=== "Parquet / Feather / ORC"
-
-    ```bash
-    pip install "noweda[parquet]"
-    ```
-
-    Installs `pyarrow`. Enables `.parquet`, `.feather`, `.orc`.
 
 === "HDF5"
 
@@ -117,7 +112,7 @@ NowEDA gives you a clear, actionable error instead of a confusing traceback:
 ```python
 eda.read("data.parquet")
 # ImportError: Reading .parquet files requires 'pyarrow'.
-# Install it with:  pip install noweda[parquet]
+# Reinstall or upgrade NowEDA to include its standard pyarrow dependency.
 ```
 
 ---

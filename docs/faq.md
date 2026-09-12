@@ -119,7 +119,16 @@ df = eda.read("data.txt", sep="\t")
 
 **Q: How does NowEDA handle very large files?**
 
-Large Parquet/ORC files (at least 128 MB) without reader options may use Spark. CSV/JSON and reads with options use pandas. The final DataFrame must fit in RAM; Spark is not guaranteed to be faster. For files that do not fit in memory, use `read_chunked(..., concat=False)` on CSV or line-delimited JSON.
+Use explicit large mode for CSV, TSV, TXT, and Parquet files that should stay on disk:
+
+```python
+data = eda.read("large.csv", mode="large", chunksize=100_000)
+data.eda.statsall()
+```
+
+Large mode prints a notice whenever a result is sample-based. Use
+`read_chunked(..., concat=False)` when you need manual streaming over CSV or
+line-delimited JSON batches.
 
 ---
 
@@ -145,10 +154,10 @@ df = eda.read("data.csv")
 
 ---
 
-**Q: I get `ImportError: Reading .parquet files requires 'pyarrow'`. How do I fix it?**
+**Q: I get `ImportError` while reading Parquet. How do I fix it?**
 
 ```bash
-pip install "noweda[parquet]"
+pip install --upgrade noweda
 ```
 
 ---

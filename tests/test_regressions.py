@@ -162,7 +162,53 @@ def test_wide_schema_rename_invalidates_cache():
 def test_printed_nullable_report(capsys):
     df = pd.DataFrame({"a": pd.Series([1, None], dtype="Int64")})
     df.eda.statsall()
-    assert "Full Statistical Report" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "Full Statistical Report" in output
+    assert "out of 100" in output
+    assert "Temporal Data Analysis" in output
+    assert "No datetime columns detected." in output
+    assert "Plugin Summary" in output
+    assert "ML Preprocessing Recommendations" in output
+    assert "Multicollinearity Assessment" in output
+    assert "Scaling Recommendation" in output
+    assert "Transformation Suggestions" in output
+    assert "Feature Review" in output
+    assert "Rare Categories" in output
+    assert "Missing Data Strategy" in output
+
+
+def test_statsall_lists_every_scaling_recommendation(capsys):
+    df = pd.DataFrame({
+        "feature_{}".format(index): np.linspace(0, 1_000, 20) + index
+        for index in range(6)
+    })
+
+    df.eda.statsall()
+    output = capsys.readouterr().out
+
+    assert "Scaling Recommended" in output
+    for index in range(6):
+        assert "feature_{}".format(index) in output
+    assert "and 1 more" not in output
+
+
+def test_statsall_excludes_binary_indicators_from_generic_preprocessing(capsys):
+    df = pd.DataFrame({
+        "fraud_flag": [0, 1] * 20,
+        "amount": np.linspace(0, 1_000, 40),
+        "balance": np.linspace(50, 1_500, 40),
+    })
+
+    df.eda.statsall()
+    output = capsys.readouterr().out
+    scaling = output.split("Scaling Recommended", 1)[1].split(
+        "Transformation Suggestions", 1
+    )[0]
+
+    assert "fraud_flag" not in scaling
+    assert "amount" in scaling
+    assert "balance" in scaling
+    assert "Excluding binary indicators" in output
 
 
 def test_feature_review_uses_schema_and_pii_roles(capsys):
@@ -195,6 +241,23 @@ def test_role_aware_cardinality_helpers_skip_numeric_and_text_rare_values():
     assert cardinality_warning(numeric, role="numeric") is None
     assert "high-cardinality text" in cardinality_warning(text, role="text")
     assert rare_category_detection(text, role="text") == {}
+
+
+def test_feature_review_roles_are_reported_on_small_datasets(capsys):
+    size = 24
+    df = pd.DataFrame({
+        "customer_id": np.arange(size),
+        "email": ["person{}@example.com".format(index) for index in range(size)],
+        "signup_date": pd.date_range("2025-01-01", periods=size).astype(str),
+    })
+
+    df.eda.statsall()
+    output = capsys.readouterr().out
+    review = output.split("Feature Review", 1)[1]
+
+    assert "likely identifier" in review
+    assert "PII (email)" in review
+    assert "temporal field" in review
 
 
 def test_unused_target_categories_do_not_create_imbalance():

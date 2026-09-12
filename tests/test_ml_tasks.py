@@ -163,14 +163,17 @@ def test_unsupervised_tasks_return_task_specific_guidance(
     assert all(1 <= score <= 5 for score in scores)
 
 
-def test_categorical_clustering_prioritizes_a_mixed_type_method():
+def test_categorical_clustering_prioritizes_a_mixed_type_method(capsys):
     df = pd.DataFrame({
         "region": ["north", "south"] * 20,
         "tier": ["basic", "plus", "premium", "basic"] * 10,
     })
     result = _plan(df, problem_type="clustering")
+    output = capsys.readouterr().out
     assert result["recommendations"][0]["name"] == "K-Modes / K-Prototypes"
     assert result["recommendations"][0]["score"] == 4.5
+    assert "K-Modes or K-Prototypes" in output
+    assert "K-Modes / K-Prototypes" not in output
 
 
 @pytest.mark.parametrize(
@@ -270,6 +273,22 @@ def test_tiny_class_and_possible_target_leakage_are_reported():
         features=["source_value"],
     )
     assert any("near-perfect correlation" in warning for warning in regression["warnings"])
+
+
+def test_temporal_guidance_uses_schema_roles_not_name_substrings():
+    df = pd.DataFrame({
+        "monthly_income": np.arange(30, dtype=float),
+        "lifetime_value": np.arange(30, dtype=float) * 5,
+        "event_timestamp": pd.date_range("2025-01-01", periods=30, freq="D"),
+        "label": ["yes", "no"] * 15,
+    })
+
+    result = _plan(df, target="label", problem_type="classification")
+    warning = next(item for item in result["warnings"] if "Temporal feature" in item)
+
+    assert "event_timestamp" in warning
+    assert "monthly_income" not in warning
+    assert "lifetime_value" not in warning
 
 
 def test_likely_identifier_target_is_flagged_for_review():

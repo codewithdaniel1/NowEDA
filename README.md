@@ -40,10 +40,35 @@ df = pd.DataFrame({
     "segment": ["A", "B", "A", "B"],
 })
 
-print(df.eda.scores_df())
-print(df.eda.missing_df())
+# Start with one complete assessment.
 df.eda.statsall()
+
+# Add charts when they help answer the next question.
+# df.eda.vizall()
+
+# Name an outcome before asking for supervised ML guidance.
+# df.eda.mlall(target="segment")
 ```
+
+### Large files
+
+Use explicit large mode when a CSV, TSV, TXT, or Parquet file should stay on
+disk. The same core `.eda` workflow supports `statsall()`, `report()`,
+`vizall()`, `mlall()`, `profile_column()`, and `compare()`.
+
+```python
+data = eda.read("data.csv", mode="large", chunksize=100_000)
+data.head()  # Reads only the requested leading rows from disk.
+data.eda.statsall()
+data.eda.mlall(target="fraud_flag")
+```
+
+Large mode calculates the dataset dimensions exactly. Exploratory findings,
+charts, profiles, comparisons, and ML guidance use a bounded sample and print
+its size before running, so estimates are never presented as full-data results.
+`statsall()`, `vizall()`, and `mlall()` use `sample=10_000` by default in large
+mode; pass another positive integer to adjust that scope. In small mode those
+methods use every loaded row by default, and accept the same `sample=` override.
 
 ## Analysis methods
 
@@ -111,9 +136,8 @@ missingness, and applicable temporal plots. Unsupported or undefined categorical
 associations appear as `N/A`, not zero association.
 
 ```python
-df.eda.vizall()              # Samples 10,000 rows when the input exceeds 50,000
-# df.eda.vizall(sample=5000)  # Choose a sample size
-# df.eda.vizall(sample=False) # Plot the complete dataset
+df.eda.vizall()               # Small mode: use every loaded row
+df.eda.vizall(sample=5_000)   # Use a bounded sample
 ```
 
 Statistical reports use the complete DataFrame; visualization sampling affects
@@ -128,7 +152,10 @@ Inspect a column's distribution, missingness, outliers, and suggested transforms
 Compare dimensions, inferred column roles, scores, and detected risks between
 two DataFrames. This is not a formal statistical test for distribution drift.
 
-## Tables and programmatic reports
+## Advanced: tables and programmatic reports
+
+Most notebook and pipeline code should start with `report()`. The individual
+tables below are focused extracts for dashboards, tests, and custom workflows.
 
 | Method | Output |
 |---|---|
@@ -174,7 +201,7 @@ df = eda.read("data.csv", dtype={"customer_id": str})
 |---|---|
 | CSV, TSV, TXT, JSON/JSONL, XLSX/XLSM, XML, HTML, Stata, SAS, Pickle | `pip install noweda` |
 | XLS, XLSB, ODS/ODF/ODT | `pip install "noweda[excel]"` |
-| Parquet, Feather, ORC | `pip install "noweda[parquet]"` |
+| Parquet, Feather, ORC | Included with `pip install noweda` |
 | HDF5 | `pip install "noweda[hdf]"` |
 | SPSS | `pip install "noweda[spss]"` |
 | Charts and KDE overlays | `pip install "noweda[viz]"` |
@@ -185,12 +212,17 @@ Only read Pickle files from trusted sources, since loading them can execute code
 
 ## Large files
 
-CSV, JSON, and all chunked reads use pandas consistently regardless of file size.
-PySpark is a standard dependency. Large Parquet/ORC files (at least
-128 MB) without reader options may use Spark, with a pandas fallback on failure.
-Spark requires a compatible Java installation. Reads with options use pandas.
-Spark loading still collects the final pandas DataFrame into local memory and
-is not guaranteed to be faster.
+Use explicit large mode for CSV, TSV, TXT, and Parquet files that should stay
+on disk:
+
+```python
+data = eda.read("large.csv", mode="large", chunksize=100_000)
+data.eda.report()
+```
+
+Large mode reports exact dimensions. Its exploratory methods print a clear
+sample-size notice before returning sample-based estimates. `read_chunked()`
+remains available for manual streaming of CSV and line-delimited JSON.
 
 For data that does not fit in memory, iterate over CSV or line-delimited JSON:
 

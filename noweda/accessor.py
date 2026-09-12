@@ -12,6 +12,21 @@ from noweda.temporal_utils import detect_temporal_columns, stationarity_test, de
 from noweda.ml_tasks import build_ml_guidance, format_ml_plan
 from noweda.ui import loading
 
+
+def _analysis_sample(df, sample, method_name):
+    """Return a bounded deterministic sample for an expensive analysis method."""
+    if sample is None:
+        return df
+    if isinstance(sample, bool) or not isinstance(sample, int) or sample <= 0:
+        raise ValueError("sample must be a positive integer")
+    if len(df) <= sample:
+        return df
+    print(
+        f"NowEDA · {method_name}: sample-based results use {sample:,} of "
+        f"{len(df):,} rows. Estimates may differ from the full dataset."
+    )
+    return df.sample(n=sample, random_state=42)
+
 @pd.api.extensions.register_dataframe_accessor("noweda")
 @pd.api.extensions.register_dataframe_accessor("eda")
 class NowEDAAccessor:
@@ -326,12 +341,17 @@ class NowEDAAccessor:
                 table[label] = [details.get(col, {}).get(key) for col in encoding]
         return table
 
-    def statsall(self):
+    def statsall(self, sample=None):
         """Print a rich full-analysis report to the terminal/notebook.
 
         Combines: dtypes, describe-style stats per column, scores,
-        insights, and a structured summary — all in one call.
+        insights, and a structured summary — all in one call. By default it
+        analyzes every input row. Set ``sample`` to a positive integer to use
+        a deterministic sample and announce that scope.
         """
+        analysis_df = _analysis_sample(self._df, sample, "statsall()")
+        if analysis_df is not self._df:
+            return analysis_df.eda.statsall(sample=sample)
         self._ensure_analyzed()
         df = self._df
         report = self._report
@@ -379,8 +399,8 @@ class NowEDAAccessor:
         dq  = scores.get("data_quality", "N/A")
         mr  = scores.get("model_readiness", "N/A")
         risk = scores.get("risk", "N/A")
-        print(f"  Data Quality    : {score_color(dq)  if isinstance(dq, (int,float))  else dq} / 100")
-        print(f"  Model Readiness : {score_color(mr)  if isinstance(mr, (int,float))  else mr} / 100")
+        print(f"  Data Quality    : {score_color(dq)  if isinstance(dq, (int,float))  else dq} out of 100")
+        print(f"  Model Readiness : {score_color(mr)  if isinstance(mr, (int,float))  else mr} out of 100")
         print(f"  Risk            : {_RED if isinstance(risk,(int,float)) and risk>0 else _GREEN}{risk}{_RESET}  (0 = no risk)")
 
         # ── Dtypes ───────────────────────────────────────────────────────────
@@ -444,7 +464,7 @@ class NowEDAAccessor:
                 top   = str(s.get("top_value", "N/A"))[:26]
                 freq  = s.get("top_freq", 0)
 
-                # Calculate diversity: entropy-based (0=uniform, 1=one dominant)
+                # Calculate diversity: entropy-based (0=one dominant, 1=uniform)
                 if count > 0 and uniq > 0 and np is not None:
                     value_counts = df[col].value_counts(normalize=True)
                     # Shannon entropy: higher = more uniform, lower = more imbalanced
@@ -490,8 +510,8 @@ class NowEDAAccessor:
 
         # ── Temporal Analysis ─────────────────────────────────────────────────
         temporal = detect_temporal_columns(df)
+        h2("Temporal Data Analysis")
         if temporal:
-            h2("Temporal Data Analysis")
             for col, (dtype, frequency, confidence) in temporal.items():
                 print(f"\n  {_BOLD}{col}{_RESET}")
                 print(f"    Type        : {dtype} (confidence: {confidence:.0%})")
@@ -508,30 +528,103 @@ class NowEDAAccessor:
                     has_season, strength = detect_seasonality(df[col])
                     if has_season or strength > 0:
                         print(f"    Seasonality : {_YELLOW}Detected{_RESET} (strength={strength:.2f})" if has_season else f"    Seasonality : None (strength={strength:.2f})")
+        else:
+            print("  No datetime columns detected.")
 
         # ── Plugin Summary ────────────────────────────────────────────────────
         h2("Plugin Summary")
-        for plugin_name, plugin_result in results.items():
-            if plugin_name in ("stats", "schema"):
-                continue  # already shown above
-            print(f"\n  [{plugin_name}]")
-            if isinstance(plugin_result, dict):
-                for k, v in plugin_result.items():
-                    if isinstance(v, dict):
-                        inner = ", ".join(f"{ik}={iv}" for ik, iv in list(v.items())[:4])
-                        print(f"    {k}: {{{inner}}}")
-                    elif isinstance(v, list) and len(v) > 5:
-                        print(f"    {k}: [{', '.join(str(x) for x in v[:5])}, … +{len(v)-5} more]")
-                    else:
-                        print(f"    {k}: {v}")
+        missing = results.get("missing", {})
+        missing_columns = [col for col, rate in missing.items() if rate > 0]
+        if missing_columns:
+            highest_missing = max(missing_columns, key=lambda col: missing[col])
+            print(f"  Missing data    : {len(missing_columns)} column(s); highest is {highest_missing} ({missing[highest_missing]:.1%})")
+        else:
+            print("  Missing data    : none")
+
+        duplicates = results.get("duplicates", {})
+        duplicate_rows = duplicates.get("duplicate_rows", 0)
+        duplicate_pct = duplicates.get("duplicate_rows_pct", 0.0)
+        constants = duplicates.get("constant_columns", [])
+        duplicate_summary = f"{duplicate_rows:,} row(s) ({duplicate_pct:.1%})"
+        if constants:
+            duplicate_summary += f"; constant: {', '.join(map(str, constants[:3]))}"
+            if len(constants) > 3:
+                duplicate_summary += f" and {len(constants) - 3} more"
+        print(f"  Duplicates      : {duplicate_summary}")
+
+        correlation = results.get("correlation", {})
+        strong_pairs = []
+        seen_pairs = set()
+        if isinstance(correlation, dict):
+            for left, values in correlation.items():
+                if not isinstance(values, dict):
+                    continue
+                for right, value in values.items():
+                    pair = tuple(sorted((str(left), str(right))))
+                    if left == right or pair in seen_pairs or not isinstance(value, (int, float)):
+                        continue
+                    seen_pairs.add(pair)
+                    if abs(value) >= 0.7:
+                        strong_pairs.append((left, right, value))
+        if strong_pairs:
+            strong_pairs.sort(key=lambda item: -abs(item[2]))
+            examples = ", ".join(
+                f"{left} ↔ {right} ({value:.2f})" for left, right, value in strong_pairs[:2]
+            )
+            suffix = f" and {len(strong_pairs) - 2} more" if len(strong_pairs) > 2 else ""
+            print(f"  Correlations    : {len(strong_pairs)} strong pair(s): {examples}{suffix}")
+        else:
+            print("  Correlations    : no strong pairs (|r| ≥ 0.70)")
+
+        outliers = results.get("outliers", {})
+        outlier_columns = {col: count for col, count in outliers.items() if count > 0}
+        if outlier_columns:
+            print(f"  Outliers        : {sum(outlier_columns.values()):,} finding(s) across {len(outlier_columns)} column(s)")
+        else:
+            print("  Outliers        : none")
+
+        pii = results.get("pii", {})
+        if pii:
+            pii_columns = ", ".join(map(str, list(pii)[:4]))
+            suffix = f" and {len(pii) - 4} more" if len(pii) > 4 else ""
+            print(f"  PII             : {len(pii)} column(s): {pii_columns}{suffix}")
+        else:
+            print("  PII             : none detected")
+
+        encoding = results.get("encoding", {})
+        if encoding:
+            encoding_columns = ", ".join(map(str, list(encoding)[:4]))
+            suffix = f" and {len(encoding) - 4} more" if len(encoding) > 4 else ""
+            print(f"  Encoded values  : {len(encoding)} column(s): {encoding_columns}{suffix}")
+        else:
+            print("  Encoded values  : none detected")
 
         # ── ML Preprocessing Guide ────────────────────────────────────────────
         h2("ML Preprocessing Recommendations")
 
         # Multicollinearity
         num_cols = [c for c in df.columns if df[c].dtype.kind in ("i", "u", "f")]
-        if len(num_cols) >= 2:
-            vif_data = calculate_vif(df, num_cols)
+        preprocessing_cols = []
+        vif_cols = []
+        excluded_preprocessing_cols = []
+        for col in num_cols:
+            observed = df[col].dropna()
+            role = schema.get(col, {}).get("role", "unknown")
+            if observed.nunique() > 2:
+                vif_cols.append(col)
+            if role == "id_candidate" or observed.nunique() <= 2:
+                excluded_preprocessing_cols.append(col)
+            else:
+                preprocessing_cols.append(col)
+
+        if excluded_preprocessing_cols:
+            print(
+                "  Excluding binary indicators and likely identifiers from generic "
+                "preprocessing: {}".format(", ".join(map(str, excluded_preprocessing_cols)))
+            )
+
+        if len(vif_cols) >= 2:
+            vif_data = calculate_vif(df, vif_cols)
             if vif_data:
                 high_vif = {col: vif for col, vif in vif_data.items() if isinstance(vif, (int, float)) and vif > 5}
                 if high_vif:
@@ -542,24 +635,28 @@ class NowEDAAccessor:
                     print(f"\n  {_GREEN}✓ Low Multicollinearity (all VIF <= 5){_RESET}")
                 if any(pd.isna(vif) for vif in vif_data.values()):
                     print("  VIF unavailable for constant columns or insufficient complete observations.")
+            else:
+                print(f"\n  {_YELLOW}Multicollinearity Assessment: unavailable for the selected numeric columns{_RESET}")
+        else:
+            print(f"\n  {_GREEN}Multicollinearity Assessment: need at least two numeric columns{_RESET}")
 
         # Scaling recommendations
         scaling_needed = []
-        for col in num_cols:
+        for col in preprocessing_cols:
             rec = get_scaling_recommendation(df[col])
             if rec and "scale" in rec:
                 scaling_needed.append(col)
 
         if scaling_needed:
             print(f"\n  {_YELLOW}Scaling Recommended:{_RESET}")
-            for col in scaling_needed[:5]:
+            for col in scaling_needed:
                 print(f"    {str(col):20s}: Use StandardScaler or MinMaxScaler")
-            if len(scaling_needed) > 5:
-                print(f"    … and {len(scaling_needed) - 5} more")
+        else:
+            print(f"\n  {_GREEN}Scaling Recommendation: no numeric columns need scaling guidance{_RESET}")
 
         # Transformations
         transform_candidates = []
-        for col in num_cols:
+        for col in preprocessing_cols:
             suggestion = get_transformation_suggestion(df[col])
             if suggestion:
                 transform_candidates.append((col, suggestion))
@@ -570,6 +667,8 @@ class NowEDAAccessor:
                 print(f"    {str(col):20s}: {suggestion}")
             if len(transform_candidates) > 5:
                 print(f"    … and {len(transform_candidates) - 5} more")
+        else:
+            print(f"\n  {_GREEN}Transformation Suggestions: none based on the observed distributions{_RESET}")
 
         # Role-aware feature review. High uniqueness is normal for continuous
         # numeric values and means something different for IDs, PII, dates,
@@ -588,6 +687,8 @@ class NowEDAAccessor:
             print(f"\n  {_YELLOW}Feature Review (Identifiers, PII, Text, and Cardinality):{_RESET}")
             for col, issue in feature_review:
                 print(f"    {str(col):20s}: {issue}")
+        else:
+            print(f"\n  {_GREEN}Feature Review: no identifier, PII, text, or cardinality concerns detected{_RESET}")
 
         # Rare categories
         rare_issues = {}
@@ -604,6 +705,8 @@ class NowEDAAccessor:
                 print(f"    {str(col):20s}: {rare_str}")
                 if len(rare_cats) > 2:
                     print(f"                     {' and ' + str(len(rare_cats) - 2) + ' more rare values'}")
+        else:
+            print(f"\n  {_GREEN}Rare Categories: none below 1% prevalence{_RESET}")
 
         # Missing data handling
         cols_with_missing = [c for c in df.columns if df[c].isna().sum() > 0]
@@ -618,6 +721,8 @@ class NowEDAAccessor:
                 else:
                     rec = f"impute ({missing_pct:.0f}% missing)"
                 print(f"    {str(col):20s}: {rec}")
+        else:
+            print(f"\n  {_GREEN}Missing Data Strategy: no missing values detected{_RESET}")
 
         print(f"\n{_CYAN}{'='*70}{_RESET}\n")
 
@@ -628,11 +733,11 @@ class NowEDAAccessor:
         ----------
         sample : int or None, default None
             Number of rows to sample for visualization. Useful for large datasets (>50k rows).
-            - If None: auto-sample if df has > 50,000 rows (uses 10,000 rows)
-            - If int: use exactly that many rows for viz (analysis still uses full data)
-            - If False: disable sampling, use full dataset (may be slow on huge files)
+            By default charts use every input row. Use a higher or lower
+            positive integer when sampling is needed; chart data is then
+            explicitly identified as sample-based.
 
-            Note: Sampling is only for visualization. All statistical analysis uses the full dataset.
+            Sampling applies to both chart data and supporting analysis.
 
         Produces
         --------
@@ -651,23 +756,25 @@ class NowEDAAccessor:
                 "Install it with: pip install matplotlib"
             )
 
+        analysis_df = _analysis_sample(self._df, sample, "vizall()")
+        if analysis_df is not self._df:
+            return analysis_df.eda.vizall(sample=sample)
+
         self._ensure_analyzed()
         df_full = self._df
 
-        # Auto-sample large datasets for faster visualization
         if sample is None:
-            # Auto-decide: if > 50k rows, sample 10k for viz
-            if len(df_full) > 50_000:
-                sample = min(10_000, len(df_full))
-            else:
-                sample = False
-
-        # Apply sampling only for viz (not for analysis)
-        if sample is False:
             df = df_full
+        elif isinstance(sample, bool) or not isinstance(sample, int) or sample <= 0:
+            raise ValueError("sample must be a positive integer")
+        elif len(df_full) > sample:
+            print(
+                f"NowEDA · vizall(): sample-based charts use {sample:,} of "
+                f"{len(df_full):,} rows. Estimates may differ from the full dataset."
+            )
+            df = df_full.sample(n=sample, random_state=42)
         else:
-            # Sample with stratification for categorical columns
-            df = df_full.sample(n=min(sample, len(df_full)), random_state=42)
+            df = df_full
         results = self._report["results"]
         schema = results.get("schema", {})
         missing_info = results.get("missing", {})
@@ -1081,7 +1188,7 @@ class NowEDAAccessor:
         if figs_shown == 0:
             print("No visualizations could be generated for this dataset.")
 
-    def mlall(self, target=None, problem_type=None, features=None, plan=False):
+    def mlall(self, target=None, problem_type=None, features=None, plan=False, sample=None):
         """Print task-aware ML guidance and optionally return its structured result.
 
         With no objective, assess likely supervised and unsupervised directions.
@@ -1090,6 +1197,12 @@ class NowEDAAccessor:
         ``plan=True`` to return the same structured guidance after it is printed.
         No models are fitted or evaluated.
         """
+        analysis_df = _analysis_sample(self._df, sample, "mlall()")
+        if analysis_df is not self._df:
+            return analysis_df.eda.mlall(
+                target=target, problem_type=problem_type, features=features,
+                plan=plan, sample=sample,
+            )
         self._ensure_analyzed()
         result = build_ml_guidance(
             self._df, self._report, target=target,

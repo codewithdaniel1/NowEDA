@@ -850,7 +850,7 @@ def build_ml_guidance(df, report, target=None, problem_type=None, features=None)
             )
         temporal_features = [
             feature for feature in selected_features
-            if _has_name_hint(feature, _TEMPORAL_NAME_HINTS)
+            if results.get("schema", {}).get(feature, {}).get("role") == "datetime"
         ]
         if temporal_features:
             warnings.append(
@@ -905,6 +905,11 @@ def _stars(score):
     return "★" * full + "☆" * (5 - full)
 
 
+def _display_recommendation_name(value):
+    """Use plain-language separators in notebook and terminal output."""
+    return str(value).replace(" / ", " or ")
+
+
 def _readiness_label(value):
     return {
         "ready": "Ready",
@@ -939,7 +944,7 @@ def format_ml_plan(plan):
         if plan["target"] is not None:
             summary = plan["target_summary"]
             print("  Selected target: {!r}".format(plan["target"]))
-            print("  Usable labels: {} / {} ({:.1%})".format(
+            print("  Usable labels: {:,} of {:,} ({:.1%})".format(
                 summary["usable_observations"], summary["observations"], summary["label_coverage"]
             ))
 
@@ -970,7 +975,9 @@ def format_ml_plan(plan):
                 ))
                 print("    {}Why:{} {}".format(green, reset, direction["reason"]))
                 top = direction["recommendations"][0]
-                print("    {}Start with:{} {}".format(green, reset, top["name"]))
+                print("    {}Start with:{} {}".format(
+                    green, reset, _display_recommendation_name(top["name"])
+                ))
 
         if plan["warnings"]:
             print("\n  {}Review before modeling:{}".format(yellow, reset))
@@ -994,7 +1001,7 @@ def format_ml_plan(plan):
     if plan["target"] is not None:
         print("  {}Target:{} {!r}".format(bold, reset, plan["target"]))
         summary = plan["target_summary"]
-        print("  {}Usable labels:{} {} / {}".format(
+        print("  {}Usable labels:{} {:,} of {:,}".format(
             bold, reset, summary["usable_observations"], summary["observations"]
         ))
     if plan["inferred"]:
@@ -1009,7 +1016,9 @@ def format_ml_plan(plan):
     print("\n  {}Candidate methods (ranked by estimated fit){}".format(bold, reset))
     print("  " + "-" * 62)
     for rec in plan["recommendations"]:
-        print("\n  {}{}{}".format(bold, rec["name"], reset))
+        print("\n  {}{}{}".format(
+            bold, _display_recommendation_name(rec["name"]), reset
+        ))
         print("    {}Estimated fit:{} {} ({:.1f}/5)".format(
             cyan, reset, _stars(rec["score"]), rec["score"]
         ))

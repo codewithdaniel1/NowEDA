@@ -1,10 +1,10 @@
 # NowEDA
 
-**Automated Exploratory Data Analysis — built as a native pandas extension with Spark acceleration built in.**
+**Automated Exploratory Data Analysis — built as a native pandas extension.**
 
 [![PyPI version](https://img.shields.io/pypi/v/noweda?label=PyPI)](https://pypi.org/project/noweda/)
 
-NowEDA profiles pandas DataFrames with heuristic quality scores, pattern-based PII detection, outlier analysis, correlations and readable insights. Use `df.noweda` or the equivalent `df.eda` accessor. Large Parquet/ORC files (at least 128 MB) without reader options may use Spark. CSV/JSON and reads with options use pandas. The final DataFrame must fit in RAM; Spark is not guaranteed to be faster.
+NowEDA profiles pandas DataFrames with heuristic quality scores, pattern-based PII detection, outlier analysis, correlations and readable insights. Use `df.noweda` or the equivalent `df.eda` accessor. For data that should stay on disk, explicit `eda.read(..., mode="large")` supports the same core `.eda` workflow and clearly marks sample-based findings.
 
 ---
 
@@ -19,7 +19,7 @@ Most EDA tools give you charts and tables. NowEDA gives you **answers**.
 | Show correlation matrix | "Very strong correlation (0.99) between 'age' and 'salary' — one may be redundant" |
 | No security awareness | "Column 'email' contains 17 PII email addresses — mask before sharing" |
 | Mix unrelated ML algorithms | Task-aware candidates for your selected target and problem type |
-| Requires specific file format | Works with 28 file extensions out of the box |
+| Requires specific file format | Supports 28 file extensions, with optional readers where needed |
 
 ---
 
@@ -47,36 +47,22 @@ df = eda.read("transactions.csv")
 print(df.head())
 print(df.describe())
 
-# Now layer on automated intelligence
-print(df.noweda.insights())   # human-readable insight list
-print(df.noweda.score())      # data_quality, risk, model_readiness
-print(df.noweda.summary())    # raw results from every plugin
-report = df.noweda.report()   # everything in one structured dict
+# Start with one complete assessment.
+df.noweda.statsall()
+
+# Add charts when a visual answer will help.
+# df.noweda.vizall()
 
 # State the target or unsupervised objective before requesting ML guidance
 df.noweda.mlall(target="fraud_flag", problem_type="classification")
-```
-
-**Example output:**
-
-```
-Insights:
- - Likely identifier column(s) detected: id. Consider excluding from modelling.
- - Column 'email' has high missing rate (32%) — imputation recommended.
- - Very strong correlation (0.99) between 'age' and 'salary'. One may be redundant.
- - PII detected in column 'email': 17 email address(es) found. Mask before sharing.
- - Data quality score is acceptable (77). Minor issues present.
- - Moderate risk level (25). Review PII and encoded columns before sharing.
-
-Scores:
-{'data_quality': 77, 'risk': 25, 'model_readiness': 53}
 ```
 
 ---
 
 ## Supported Formats
 
-NowEDA reads **28 file extensions** across all major tabular data formats:
+NowEDA supports **28 file extensions** across major tabular data formats. Some
+formats require an optional dependency extra; see [Installation](installation.md).
 
 | Category | Extensions |
 |---|---|
@@ -118,7 +104,7 @@ PySpark is included in the standard install. Charts require `pip install "noweda
 For additional format support:
 
 ```bash
-pip install "noweda[parquet]"   # Parquet, Feather, ORC
+# Parquet, Feather, and ORC are included with pip install noweda
 pip install "noweda[hdf]"       # HDF5
 pip install "noweda[spss]"      # SPSS
 pip install "noweda[full]"      # Everything

@@ -14,7 +14,20 @@ df = eda.read("path/to/file.csv")
 
 All `**kwargs` are forwarded directly to the underlying pandas reader, so every option you know from `pd.read_csv`, `pd.read_excel`, etc. works exactly the same way.
 
-Large Parquet/ORC files (at least 128 MB) without reader options may use Spark. CSV/JSON and reads with options use pandas. The final DataFrame must fit in RAM; Spark is not guaranteed to be faster.
+Use explicit large mode when a CSV, TSV, TXT, or Parquet file should remain on
+disk. It returns a `LargeDataset`, rather than a pandas DataFrame, with the
+same core `.eda` workflow:
+
+```python
+data = eda.read("data.csv", mode="large", chunksize=100_000)
+data.eda.statsall()
+data.eda.vizall()
+data.eda.mlall(target="fraud_flag")
+```
+
+Large mode calculates dataset dimensions exactly. `statsall()`, `report()`,
+`vizall()`, `mlall()`, `profile_column()`, and `compare()` otherwise use a
+bounded sample and announce its size before displaying estimated findings.
 
 `eda.read_chunked()` always uses pandas. Use `concat=False` to iterate within bounded memory; the default `concat=True` retains all chunks and allocates a combined DataFrame.
 
@@ -171,10 +184,7 @@ df = eda.read("data.html", match="Revenue")   # match by text
 
 ### Parquet / Feather / ORC
 
-!!! warning "Requires pyarrow"
-    ```bash
-    pip install "noweda[parquet]"
-    ```
+PyArrow is included in the standard `pip install noweda` package.
 
 === "Parquet"
 
@@ -307,8 +317,7 @@ eda.read("missing.csv")
 
 ```python
 eda.read("data.parquet")
-# ImportError: Reading .parquet files requires 'pyarrow'.
-# Install it with:  pip install noweda[parquet]
+# Reinstall NowEDA to include its standard pyarrow dependency.
 ```
 
 ---

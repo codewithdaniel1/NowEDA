@@ -3,8 +3,8 @@ name = "noweda"
 dynamic = ["version"]
 description = "Automated EDA with insights, scoring, and security-aware detection — built as a native pandas extension."
 readme = { file = "README.md", content-type = "text/markdown" }
-# Table syntax retains source-build compatibility with Python 3.8 setuptools.
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.8"
 authors = [{ name = "Daniel Peng", email = "danielpeng95@gmail.com" }]
 keywords = ["eda", "data-analysis", "pandas", "data-quality", "pii-detection", "automated-eda", "profiling"]
@@ -26,6 +26,8 @@ dependencies = [
     "pandas>=1.3",
     "numpy>=1.21",
     "pyspark>=3.4",
+    "duckdb>=1.1",
+    "pyarrow>=14",
     "openpyxl>=3.1",       # Excel (.xlsx, .xlsm)
     "lxml>=4.6",           # XML + HTML parsing
 ]
@@ -34,15 +36,13 @@ dependencies = [
 excel = ["xlrd>=2.0.1", "pyxlsb>=1.0.10", "odfpy>=1.4.1"]
 viz = ["matplotlib>=3.5", "scipy>=1.7"]
 ml = ["statsmodels>=0.13", "scikit-learn>=1.0"]
-test = ["pytest>=7", "pyarrow>=8.0", "odfpy>=1.4.1", "matplotlib>=3.5", "scipy>=1.7"]
-parquet = ["pyarrow>=8.0"]          # .parquet, .feather, .orc
+test = ["pytest>=7", "odfpy>=1.4.1", "matplotlib>=3.5", "scipy>=1.7"]
 hdf    = ["tables>=3.7"]            # .h5, .hdf5
 spss   = ["pyreadstat>=1.1"]        # .sav, .zsav
 full   = [
     "xlrd>=2.0.1", "pyxlsb>=1.0.10", "odfpy>=1.4.1",
     "matplotlib>=3.5", "scipy>=1.7",
     "statsmodels>=0.13", "scikit-learn>=1.0",
-    "pyarrow>=8.0",
     "tables>=3.7",
     "pyreadstat>=1.1",
 ]
@@ -57,7 +57,7 @@ Repository = "https://github.com/codewithdaniel1/NowEDA"
 noweda = "noweda.cli:main"
 
 [build-system]
-requires = ["setuptools>=61", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -66,6 +66,3 @@ include = ["noweda*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "noweda._version.__version__" }
-
-[tool.setuptools]
-license-files = ["LICENSE"]

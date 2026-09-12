@@ -4,7 +4,46 @@ All notable changes to NowEDA are documented here.
 
 ---
 
-## [0.2.0] — Unreleased
+## [0.2.1] — Unreleased
+
+### Fixed
+
+- `statsall()` now shows identifier, PII, and temporal-field guidance even on
+  small datasets where high cardinality alone would not trigger a warning.
+- ML guidance uses plain-language separators in terminal and notebook output,
+  such as `K-Modes or K-Prototypes` and `5,000 of 5,000` labels.
+- ML guidance now uses inferred datetime roles for time-aware validation advice,
+  avoiding false positives from names such as `monthly_income`.
+
+### Changed
+
+- `eda.read(..., mode="large")` now provides a disk-backed CSV, TSV, TXT, and
+  Parquet workflow with `head()`, `statsall()`, `vizall()`, `mlall()`,
+  `profile_column()`, `compare()`, and `report()`. Large-mode analysis defaults
+  to `sample=10_000` and clearly labels sample-based findings; small mode keeps
+  full-input analysis by default and accepts an optional `sample=` override.
+- Documentation now leads with the core `read()`, `statsall()`, `vizall()`,
+  `mlall()`, `profile_column()`, `compare()`, and `report()` workflow; table
+  extracts, plugins, scoring internals, and extension points are grouped as
+  advanced material.
+- Generic `statsall()` preprocessing guidance now excludes binary indicators
+  and likely identifiers, avoiding recommendations to scale probable targets
+  such as `fraud_flag`.
+- Documentation distinguishes standard readers from formats that need an
+  optional dependency extra.
+- Score summaries now use plain-language labels such as `79 out of 100`.
+- `statsall()` now keeps its temporal, plugin, and ML-preparation sections
+  visible in a fixed order, using concise summaries and explicit empty states.
+- `statsall()` now lists every scaling recommendation instead of shortening the
+  list, and the playground renders `insights_df()` as a left-aligned table.
+- Replaced the playground dataset with a deterministic 150,000-row synthetic
+  dataset that demonstrates the current profiling, quality, privacy, encoding,
+  and ML-guidance capabilities without using real personal data.
+- Updated package license metadata to the current PyPA format.
+
+---
+
+## [0.2.0] — 2026-09-12
 
 ### Added
 

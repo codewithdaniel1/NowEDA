@@ -1,6 +1,7 @@
 # Example: Working with Multiple Formats
 
-NowEDA reads 28 file extensions. This example shows how to load and analyse data from several different formats in one workflow.
+NowEDA supports 28 file extensions. Some formats need an optional dependency
+extra; this example shows how to load and analyse several formats in one workflow.
 
 ---
 
@@ -22,7 +23,7 @@ json_df  = eda.read("api_response.json")
 xml_df   = eda.read("records.xml")
 html_df  = eda.read("web_table.html")
 
-# Big data formats (requires: pip install "noweda[parquet]")
+# Columnar formats are included with pip install noweda
 parquet_df = eda.read("transactions.parquet")
 feather_df = eda.read("cache.feather")
 

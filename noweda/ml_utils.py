@@ -150,23 +150,25 @@ def cardinality_warning(col, role="unknown", pii_types=None):
     a generic categorical-encoding recommendation for all object columns.
     """
     n_unique = col.nunique()
-    if n_unique <= 100:
-        return None
-
     severity = "very high" if n_unique > 1000 else "high"
     if pii_types:
         labels = ", ".join(sorted(map(str, pii_types)))
+        cardinality = "{}-cardinality ".format(severity) if n_unique > 100 else ""
         return (
-            "{}-cardinality PII ({}) — mask or remove before sharing and exclude "
+            "{}PII ({}) — mask or remove before sharing and exclude "
             "from model features unless it is explicitly justified."
-        ).format(severity, labels)
+        ).format(cardinality, labels)
     if role == "id_candidate":
-        return "{}-cardinality likely identifier — exclude from model features.".format(severity)
+        cardinality = "{}-cardinality ".format(severity) if n_unique > 100 else ""
+        return "{}likely identifier — exclude from model features.".format(cardinality)
     if role == "datetime":
+        cardinality = "{}-cardinality ".format(severity) if n_unique > 100 else ""
         return (
-            "{}-cardinality temporal field — parse as datetime and derive temporal "
+            "{}temporal field — parse as datetime and derive temporal "
             "features; do not treat it as a categorical feature."
-        ).format(severity)
+        ).format(cardinality)
+    if n_unique <= 100:
+        return None
     if role == "text":
         return (
             "{}-cardinality text — determine whether it is free text or a code; "

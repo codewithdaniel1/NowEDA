@@ -60,32 +60,36 @@ nav:
   - Getting Started:
     - Installation: installation.md
     - Quick Start: quickstart.md
-  - User Guide:
+  - Core Workflow:
     - Reading Data: user-guide/reading-data.md
     - The NowEDA Accessor: user-guide/accessor.md
     - Task-Aware ML Guidance: ml-guidance.md
     - Understanding Reports: user-guide/reports.md
-  - Plugins:
-    - Overview: plugins/overview.md
-    - Schema Inference: plugins/schema.md
-    - Descriptive Stats: plugins/stats.md
-    - Missing Values: plugins/missing.md
-    - Duplicates & Constants: plugins/duplicates.md
-    - Correlations: plugins/correlation.md
-    - Outlier Detection: plugins/outliers.md
-    - PII Detection: plugins/pii.md
-    - Encoding Detection: plugins/encoding.md
-    - Writing Custom Plugins: plugins/custom.md
-  - Scoring System: scoring.md
-  - Insights Engine: insights.md
-  - CLI Reference: cli.md
-  - HTML Reports: html-reports.md
   - Examples:
     - Basic EDA Workflow: examples/basic-eda.md
     - Security & PII Audit: examples/security-audit.md
-    - Custom Plugin: examples/custom-plugin.md
     - Multiple Formats: examples/multi-format.md
-  - API Reference: api-reference.md
+  - Advanced:
+    - Reports and Exports:
+      - Structured Reports: user-guide/reports.md
+      - HTML Reports: html-reports.md
+      - CLI Reference: cli.md
+    - Scoring and Insights:
+      - Scoring System: scoring.md
+      - Insights Engine: insights.md
+    - Plugins:
+      - Overview: plugins/overview.md
+      - Schema Inference: plugins/schema.md
+      - Descriptive Stats: plugins/stats.md
+      - Missing Values: plugins/missing.md
+      - Duplicates & Constants: plugins/duplicates.md
+      - Correlations: plugins/correlation.md
+      - Outlier Detection: plugins/outliers.md
+      - PII Detection: plugins/pii.md
+      - Encoding Detection: plugins/encoding.md
+      - Writing Custom Plugins: plugins/custom.md
+    - Custom Plugin Example: examples/custom-plugin.md
+    - API Reference: api-reference.md
   - FAQ: faq.md
   - Changelog: changelog.md
 

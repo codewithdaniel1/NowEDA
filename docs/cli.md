@@ -53,8 +53,8 @@ noweda data.csv
 
 Scores
 ------------------------------------------------------------
-  Data Quality    : 77 / 100
-  Model Readiness : 53 / 100
+  Data Quality    : 77 out of 100
+  Model Readiness : 53 out of 100
   Risk            : 25  (0 = no risk)
 
 Columns
