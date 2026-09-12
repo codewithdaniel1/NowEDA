@@ -192,15 +192,19 @@ Use `report()` when passing data to the HTML generator, serializing to JSON, or 
 
 ---
 
-### `df.noweda.ml_plan()` and `df.noweda.mlall()`
+### `df.noweda.mlall()`
 
-Build guidance for a specific ML objective. `ml_plan()` returns a dictionary;
-`mlall()` prints the same information with heuristic stars and `/5` dataset-fit
-scores for a terminal or notebook. No models are trained or evaluated.
+Build guidance for a specific ML objective, or assess a dataset when no objective
+is supplied. `mlall()` prints heuristic stars and `/5` dataset-fit scores for a
+terminal or notebook. Set `plan=True` to return the structured result. No models are
+trained or evaluated.
 
 ```python
+# Assess likely targets and unsupervised directions without selecting a target.
+df.noweda.mlall()
+
 # The named target lets NowEDA infer classification or regression.
-plan = df.noweda.ml_plan(target="churned")
+plan = df.noweda.mlall(target="churned", plan=True)
 
 # Explicit tasks are authoritative.
 df.noweda.mlall(target="churned", problem_type="classification")
@@ -212,8 +216,8 @@ df.noweda.mlall(
 
 Supervised tasks require a target and automatically exclude it from features.
 Unsupervised tasks do not accept a target. Calling `mlall()` without an objective
-lists all supported tasks instead of guessing. See [Task-Aware ML
-Guidance](../ml-guidance.md) for the full contract.
+assesses possible targets and unsupervised directions without guessing the target.
+See [Task-Aware ML Guidance](../ml-guidance.md) for the full contract.
 
 ---
 
@@ -235,6 +239,7 @@ Output sections:
 | **Categorical stats** | count, unique values, top value, top frequency |
 | **Insights** | full human-readable bullet list |
 | **Plugin summary** | raw results from outliers, duplicates, PII, encoding |
+| **Feature review** | role-aware guidance for identifiers, PII, dates, text, and high-cardinality categories |
 
 ---
 

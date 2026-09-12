@@ -56,11 +56,14 @@ diagnostics. Constant columns and insufficient observations yield unavailable VI
 
 ### 2. `df.eda.mlall()` — Task-aware ML guidance
 
-NowEDA asks for the prediction or analysis objective before recommending methods.
-It does not silently choose a target or mix unrelated supervised and unsupervised
-algorithms into one ranking.
+With no arguments, NowEDA assesses whether supervised or unsupervised analysis is
+plausible. It presents possible target columns for review, excludes likely IDs,
+and ranks appropriate unsupervised directions. It never silently selects a target.
 
 ```python
+# Assess a dataset when you do not yet know the ML objective.
+df.eda.mlall()
+
 # Infer binary/multiclass classification or regression from the named target.
 df.eda.mlall(target="segment")
 
@@ -68,8 +71,8 @@ df.eda.mlall(target="segment")
 df.eda.mlall(target="segment", problem_type="classification")
 df.eda.mlall(problem_type="clustering", features=["age", "income"])
 
-# Get the same guidance as structured data instead of printed output.
-plan = df.eda.ml_plan(target="segment")
+# Get the printed guidance and the structured result for use in code.
+plan = df.eda.mlall(target="segment", plan=True)
 ```
 
 **Supported problem types**
@@ -83,13 +86,16 @@ time-aware validation.
 
 Classification and regression require `target=`. If `problem_type` is omitted,
 NowEDA infers one from the target dtype and cardinality, shows the reason, and lets
-you override it. The target is excluded from features and invalid targets fail with
-a clear error.
+you override it. The target is excluded from features. It reports label coverage,
+partial labels, small samples, imbalance, likely IDs, and potential leakage before
+recommending a supervised workflow.
 
 **Unsupervised tasks**
 
 Clustering, anomaly detection, and dimensionality reduction do not accept a target.
 Use `features=` to limit the analysis to columns available for that objective.
+When no usable labels are available for a selected target, NowEDA explains that
+supervised training cannot begin and presents unsupervised directions instead.
 
 **Honest guidance**
 

@@ -9,7 +9,7 @@ from noweda.ml_utils import (
     get_scaling_recommendation, get_transformation_suggestion, assess_column_quality
 )
 from noweda.temporal_utils import detect_temporal_columns, stationarity_test, detect_seasonality
-from noweda.ml_tasks import build_ml_plan, format_ml_plan
+from noweda.ml_tasks import build_ml_guidance, format_ml_plan
 from noweda.ui import loading
 
 @pd.api.extensions.register_dataframe_accessor("noweda")
@@ -571,23 +571,29 @@ class NowEDAAccessor:
             if len(transform_candidates) > 5:
                 print(f"    … and {len(transform_candidates) - 5} more")
 
-        # Cardinality warnings
-        cat_cols = [c for c in df.columns if is_textual(df[c])]
-        cardinality_issues = []
-        for col in cat_cols:
-            warning = cardinality_warning(df[col])
+        # Role-aware feature review. High uniqueness is normal for continuous
+        # numeric values and means something different for IDs, PII, dates,
+        # free text, and true categorical values.
+        pii = results.get("pii", {})
+        feature_review = []
+        for col in df.columns:
+            role = schema.get(col, {}).get("role", "unknown")
+            warning = cardinality_warning(
+                df[col], role=role, pii_types=pii.get(col)
+            )
             if warning:
-                cardinality_issues.append((col, warning))
+                feature_review.append((col, warning))
 
-        if cardinality_issues:
-            print(f"\n  {_RED}Cardinality Issues:{_RESET}")
-            for col, issue in cardinality_issues:
+        if feature_review:
+            print(f"\n  {_YELLOW}Feature Review (Identifiers, PII, Text, and Cardinality):{_RESET}")
+            for col, issue in feature_review:
                 print(f"    {str(col):20s}: {issue}")
 
         # Rare categories
         rare_issues = {}
-        for col in cat_cols:
-            rare = rare_category_detection(df[col], threshold=0.01)
+        for col in df.columns:
+            role = schema.get(col, {}).get("role", "unknown")
+            rare = rare_category_detection(df[col], threshold=0.01, role=role)
             if rare:
                 rare_issues[col] = rare
 
@@ -1075,28 +1081,23 @@ class NowEDAAccessor:
         if figs_shown == 0:
             print("No visualizations could be generated for this dataset.")
 
-    def ml_plan(self, target=None, problem_type=None, features=None):
-        """Return task-aware ML guidance without fitting or evaluating models.
+    def mlall(self, target=None, problem_type=None, features=None, plan=False):
+        """Print task-aware ML guidance and optionally return its structured result.
 
-        Supported problem types are classification, regression, clustering,
-        anomaly_detection, and dimensionality_reduction. If target is supplied
-        without a problem type, classification or regression is inferred and the
-        reason is returned. ``features`` optionally selects input columns.
+        With no objective, assess likely supervised and unsupervised directions.
+        Classification and regression require ``target``; clustering, anomaly
+        detection, and dimensionality reduction use ``problem_type``. Set
+        ``plan=True`` to return the same structured guidance after it is printed.
+        No models are fitted or evaluated.
         """
         self._ensure_analyzed()
-        return build_ml_plan(
+        result = build_ml_guidance(
             self._df, self._report, target=target,
             problem_type=problem_type, features=features,
         )
-
-    def mlall(self, target=None, problem_type=None, features=None):
-        """Print task-aware ML guidance; see :meth:`ml_plan` for parameters."""
-        self._ensure_analyzed()
-        plan = build_ml_plan(
-            self._df, self._report, target=target,
-            problem_type=problem_type, features=features,
-        )
-        format_ml_plan(plan)
+        format_ml_plan(result)
+        if plan:
+            return result
 
     def profile_column(self, column_name):
         """Deep dive into a single column's characteristics and recommendations.
@@ -1332,7 +1333,6 @@ def _loading_message(method_name, args, kwargs):
         "statsall": "NowEDA · Building full statistical report",
         "vizall": "NowEDA · Rendering visualizations",
         "mlall": "NowEDA · Building ML recommendations",
-        "ml_plan": "NowEDA · Building ML recommendation plan",
         "compare": "NowEDA · Comparing datasets",
     }
     return messages.get(method_name, f"NowEDA · Running {method_name}")
@@ -1366,7 +1366,6 @@ for _method_name in (
     "statsall",
     "vizall",
     "mlall",
-    "ml_plan",
     "profile_column",
     "compare",
 ):

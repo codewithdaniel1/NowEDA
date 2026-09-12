@@ -4,6 +4,30 @@ All notable changes to NowEDA are documented here.
 
 ---
 
+## [0.2.0] — Unreleased
+
+### Added
+
+- `mlall()` with no arguments now assesses possible target candidates, supervised
+  and unsupervised readiness, likely identifiers, usable features, and ranked
+  unsupervised directions without selecting a target automatically.
+- Named targets now report label coverage and readiness. Targets with no observed
+  labels explain why supervised training cannot begin and show unsupervised
+  directions instead.
+- Added temporal-feature warnings for supervised guidance and explicit cautions
+  that anomalies are not automatically business or security outcomes.
+
+### Changed
+
+- `mlall(..., plan=True)` now returns the structured guidance after printing it.
+- Removed the public `ml_plan()` accessor; `mlall()` is the single public ML
+  guidance method.
+- `statsall()` now gives high-uniqueness guidance based on each field's inferred
+  role, so continuous measures, dates, PII, and free text are not presented as
+  ordinary categorical features.
+
+---
+
 ## [0.1.5] — 2026-09-12
 
 ### Added

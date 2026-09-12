@@ -1,7 +1,11 @@
 # Virtual environment
 .venv/
+.venv*/
 venv/
 env/
+
+# Local assistant configuration and dependency snapshots
+.claude/
 
 # Build artifacts
 *.egg-info/

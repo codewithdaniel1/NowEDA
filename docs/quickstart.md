@@ -107,12 +107,15 @@ report = df.noweda.report()
 
 ## Step 4 — Get task-aware ML guidance
 
-NowEDA needs your objective before it can recommend relevant candidate methods.
-For supervised work, name the target:
+Start with an automatic assessment when you are unsure which direction fits the
+dataset. For supervised work, name the target:
 
 ```python
+# Assesses likely targets and unsupervised directions without selecting a target.
+df.noweda.mlall()
+
 # Infers classification or regression and explains the inference.
-plan = df.noweda.ml_plan(target="fraud_flag")
+plan = df.noweda.mlall(target="fraud_flag", plan=True)
 print(plan["problem_type"], plan["inference_reason"])
 
 # Printed guidance with an explicit task.

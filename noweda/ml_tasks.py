@@ -17,6 +17,22 @@ PROBLEM_TYPES = (
     "dimensionality_reduction",
 )
 
+_SUPERVISED_TYPES = ("classification", "regression")
+_UNSUPERVISED_TYPES = (
+    "clustering",
+    "anomaly_detection",
+    "dimensionality_reduction",
+)
+
+# A column name is only a hint.  NowEDA never treats these as an automatically
+# selected prediction target; it presents them for the user to review.
+_TARGET_NAME_HINTS = (
+    "target", "label", "outcome", "response", "class", "fraud", "churn",
+    "default", "flag", "status", "converted", "conversion",
+)
+_TEMPORAL_NAME_HINTS = ("date", "time", "timestamp", "period", "month", "year")
+_IDENTIFIER_NAME_HINTS = ("_id", "id_", "uuid", "guid", "identifier", "record_key")
+
 _ALIASES = {
     "binary": "classification",
     "binary_classification": "classification",
@@ -86,6 +102,152 @@ def _feature_frame(df, target=None, features=None):
     return df.iloc[:, positions].copy(), selected
 
 
+def _column_name_text(column):
+    """Return a conservative text representation for name-based hints."""
+    return str(column).strip().lower()
+
+
+def _has_name_hint(column, hints):
+    name = _column_name_text(column)
+    return any(hint in name for hint in hints)
+
+
+def _looks_like_identifier(column):
+    name = _column_name_text(column)
+    return name == "id" or _has_name_hint(column, _IDENTIFIER_NAME_HINTS)
+
+
+def _label_readiness(observed_count, total_count, problem_type=None, class_counts=None):
+    """Describe whether a named outcome has enough observed labels to proceed."""
+    coverage = observed_count / total_count if total_count else 0.0
+    if observed_count == 0:
+        return "unlabeled", coverage
+    if observed_count < 30:
+        return "limited", coverage
+    if problem_type == "classification" and class_counts and min(class_counts.values()) < 5:
+        return "limited", coverage
+    if coverage < 0.80:
+        return "partial", coverage
+    return "ready", coverage
+
+
+def _candidate_target(df, column, schema):
+    """Return a possible target only when both name and values support the idea."""
+    name_hint = _has_name_hint(column, _TARGET_NAME_HINTS)
+    role = schema.get(column, {}).get("role")
+    series = df.iloc[:, _column_position(df, column, "Candidate")]
+    observed = series.dropna()
+    total = int(len(series))
+    observed_count = int(len(observed))
+
+    # An all-missing column can still be a useful candidate when its name makes
+    # its intended use clear (for example, fraud_flag before labeling begins).
+    if not name_hint or role == "id_candidate":
+        return None
+
+    unique = int(observed.nunique())
+    if observed_count and unique < 2:
+        return None
+
+    problem_type = None
+    subtype = None
+    reason = "name suggests a possible outcome"
+    class_counts = None
+    if observed_count:
+        try:
+            problem_type, type_reason = _infer_supervised_type(observed)
+        except ValueError:
+            return None
+        reason = "{}; {}".format(reason, type_reason)
+        if problem_type == "classification":
+            subtype = "binary" if unique == 2 else "multiclass"
+            class_counts = {str(label): int(count) for label, count in observed.value_counts().items()}
+        else:
+            subtype = "continuous"
+
+    readiness, coverage = _label_readiness(
+        observed_count, total, problem_type, class_counts=class_counts
+    )
+    score = 3.0
+    if observed_count:
+        score += 0.5
+    if readiness == "ready":
+        score += 0.5
+    elif readiness == "unlabeled":
+        score -= 0.5
+    return {
+        "column": column,
+        "score": _fit_score(score),
+        "problem_type": problem_type,
+        "problem_subtype": subtype,
+        "observations": total,
+        "usable_observations": observed_count,
+        "label_coverage": coverage,
+        "readiness": readiness,
+        "reason": reason,
+    }
+
+
+def _target_candidates(df, results):
+    schema = results.get("schema", {})
+    candidates = [
+        candidate for column in df.columns
+        for candidate in [_candidate_target(df, column, schema)]
+        if candidate is not None
+    ]
+    return sorted(candidates, key=lambda item: item["score"], reverse=True)
+
+
+def _assessment_features(df, selected_features, results, candidates):
+    """Exclude likely identifiers and possible outcomes from automatic unsupervised guidance."""
+    schema = results.get("schema", {})
+    candidate_columns = {candidate["column"] for candidate in candidates}
+    id_features = [
+        column for column in selected_features
+        if (
+            schema.get(column, {}).get("role") == "id_candidate"
+            and _looks_like_identifier(column)
+        )
+    ]
+    excluded_candidates = [
+        column for column in selected_features if column in candidate_columns
+    ]
+    usable = [
+        column for column in selected_features
+        if column not in id_features and column not in excluded_candidates
+    ]
+    return df.loc[:, usable].copy(), usable, id_features, excluded_candidates
+
+
+def _assessment_direction(problem_type, recommendations, profile):
+    """Summarize one unsupervised direction without claiming measured performance."""
+    top = recommendations[0]
+    if problem_type == "anomaly_detection":
+        reason = (
+            "Multiple usable numeric features can be screened for unusual combinations."
+            if profile["n_numeric"] >= 2
+            else "Feature encoding is needed before unusual observations can be compared."
+        )
+    elif problem_type == "clustering":
+        reason = (
+            "Multiple usable features can support exploratory segmentation after preprocessing."
+            if profile["n_cols"] >= 2
+            else "More than one usable feature is needed for meaningful segmentation."
+        )
+    else:
+        reason = (
+            "Several features may benefit from compact exploratory representations."
+            if profile["n_cols"] >= 2
+            else "More than one usable feature is needed for dimensionality reduction."
+        )
+    return {
+        "problem_type": problem_type,
+        "score": top["score"],
+        "reason": reason,
+        "recommendations": recommendations,
+    }
+
+
 def _infer_supervised_type(target):
     observed = target.dropna()
     unique = int(observed.nunique())
@@ -111,7 +273,20 @@ def _target_summary(df, target, problem_type, requested_subtype=None):
     series = df.iloc[:, position]
     observed = series.dropna()
     if observed.empty:
-        raise ValueError("Target {!r} has no nonmissing observations".format(target))
+        return {
+            "column": target,
+            "dtype": str(series.dtype),
+            "observations": int(len(series)),
+            "usable_observations": 0,
+            "missing": int(series.isna().sum()),
+            "unique": 0,
+            "label_coverage": 0.0,
+            "readiness": "unlabeled",
+            "subtype": None,
+        }, [
+            "Target {!r} has no labeled observations, so supervised training cannot begin.".format(target),
+            "Review label acquisition, or consider an explicitly selected unsupervised objective."
+        ]
     unique = int(observed.nunique())
     if unique < 2:
         raise ValueError("Target {!r} is constant; at least two outcomes are required".format(target))
@@ -172,6 +347,21 @@ def _target_summary(df, target, problem_type, requested_subtype=None):
                 "The numeric target has only {} distinct values; classification or ordinal modeling may also be plausible."
                 .format(unique)
             )
+    readiness, coverage = _label_readiness(
+        len(observed), len(series), problem_type, summary.get("class_counts")
+    )
+    summary["label_coverage"] = coverage
+    summary["readiness"] = readiness
+    if readiness == "partial":
+        warnings.append(
+            "Only {:.1%} of rows have labels. Supervised training uses those rows only; review label acquisition or a semi-supervised strategy before modeling."
+            .format(coverage)
+        )
+    elif readiness == "limited":
+        warnings.append(
+            "Only {} labeled rows are available; collect more labels before relying on supervised validation."
+            .format(len(observed))
+        )
     return summary, warnings
 
 
@@ -472,54 +662,161 @@ def _evaluation(problem_type, target_summary):
     ]
 
 
-def build_ml_plan(df, report, target=None, problem_type=None, features=None):
-    """Return an explainable task-specific recommendation plan without fitting models."""
+def _selected_results(results, selected_features):
+    return {
+        key: ({col: value for col, value in value.items() if col in selected_features}
+              if key in ("missing", "outliers", "stats", "schema", "correlation") else value)
+        for key, value in results.items()
+    }
+
+
+def _automatic_assessment(df, report, features=None, target=None, target_summary=None):
+    """Assess plausible ML directions without selecting a target on the user's behalf."""
+    results = report.get("results", {})
+    if features is None:
+        selected_features = [column for column in df.columns if column != target]
+    else:
+        _, selected_features = _feature_frame(df, target=target, features=features)
+    candidates = _target_candidates(df, results)
+    feature_df, usable_features, id_features, candidate_features = _assessment_features(
+        df, selected_features, results, candidates
+    )
+    selected_results = _selected_results(results, usable_features)
+    profile = _profile(
+        feature_df,
+        selected_results.get("stats", {}),
+        selected_results.get("schema", {}),
+        report.get("scores", {}),
+        selected_results,
+    )
+
+    warnings = []
+    if id_features:
+        warnings.append(
+            "Likely identifier feature(s) were excluded from automatic ML assessment: {}."
+            .format(id_features)
+        )
+    if candidate_features:
+        warnings.append(
+            "Possible target column(s) were excluded from automatic unsupervised guidance: {}."
+            .format(candidate_features)
+        )
+    if len(usable_features) < 2:
+        unsupervised_readiness = "low"
+        warnings.append(
+            "At least two usable non-identifier features are needed for meaningful unsupervised guidance."
+        )
+    elif profile["high_missing"]:
+        unsupervised_readiness = "moderate"
+        warnings.append(
+            "High missingness lowers unsupervised readiness until an imputation strategy is chosen."
+        )
+    else:
+        unsupervised_readiness = "high"
+
+    directions = []
+    recommendations = []
+    if unsupervised_readiness != "low":
+        factories = {
+            "clustering": _clustering_recommendations,
+            "anomaly_detection": _anomaly_recommendations,
+            "dimensionality_reduction": _reduction_recommendations,
+        }
+        for problem_type in _UNSUPERVISED_TYPES:
+            task_recommendations = factories[problem_type](profile)
+            directions.append(_assessment_direction(problem_type, task_recommendations, profile))
+            top = dict(task_recommendations[0])
+            top["problem_type"] = problem_type
+            recommendations.append(top)
+        directions.sort(key=lambda item: item["score"], reverse=True)
+        recommendations.sort(key=lambda item: item["score"], reverse=True)
+
+    if candidates:
+        supervised_readiness = candidates[0]["readiness"]
+    else:
+        supervised_readiness = "not_assessed"
+        warnings.append(
+            "No likely target candidates were found. Select target= explicitly for supervised guidance."
+        )
+
+    assessment = {
+        "supervised_readiness": supervised_readiness,
+        "unsupervised_readiness": unsupervised_readiness,
+        "target_candidates": candidates,
+        "likely_identifiers": id_features,
+        "excluded_candidate_targets": candidate_features,
+        "usable_features": usable_features,
+        "directions": directions,
+    }
+    return {
+        "problem_type": None,
+        "problem_subtype": None,
+        "target": target,
+        "target_summary": target_summary,
+        "features": usable_features,
+        "inferred": False,
+        "inference_reason": None,
+        "recommendations": recommendations,
+        "preprocessing": _preprocessing("clustering", profile, None) if usable_features else [],
+        "evaluation": [],
+        "warnings": warnings,
+        "assessment": assessment,
+        "supervised_unavailable": False,
+        "supported_problem_types": list(PROBLEM_TYPES),
+    }
+
+
+def build_ml_guidance(df, report, target=None, problem_type=None, features=None):
+    """Build explainable ML guidance without fitting or evaluating models."""
     resolved, requested_subtype = _normalise_problem_type(problem_type)
     inferred = False
     inference_reason = None
 
     if resolved is None and target is None:
-        _, selected_features = _feature_frame(df, features=features)
-        return {
-            "problem_type": None,
-            "problem_subtype": None,
-            "target": None,
-            "target_summary": None,
-            "features": selected_features,
-            "inferred": False,
-            "inference_reason": None,
-            "recommendations": [],
-            "preprocessing": [],
-            "evaluation": [],
-            "warnings": [
-                "No ML objective was selected. Choose a problem_type; supervised tasks also require target."
-            ],
-            "supported_problem_types": list(PROBLEM_TYPES),
-        }
+        return _automatic_assessment(df, report, features=features)
 
-    supervised = resolved in ("classification", "regression") or resolved is None
+    supervised = resolved in _SUPERVISED_TYPES or resolved is None
     if supervised and target is None:
         raise ValueError("problem_type {!r} requires target=".format(resolved or "auto"))
     if not supervised and target is not None:
         raise ValueError("target is only accepted for classification or regression")
 
+    results = report.get("results", {})
     if resolved is None:
         position = _column_position(df, target, "Target")
         observed = df.iloc[:, position].dropna()
         if observed.empty:
-            raise ValueError("Target {!r} has no nonmissing observations".format(target))
+            summary, target_warnings = _target_summary(df, target, None)
+            plan = _automatic_assessment(
+                df, report, features=features, target=target, target_summary=summary
+            )
+            plan["warnings"] = target_warnings + plan["warnings"]
+            return plan
         resolved, inference_reason = _infer_supervised_type(observed)
         inferred = True
 
     target_summary = None
     warnings = []
-    if resolved in ("classification", "regression"):
+    if resolved in _SUPERVISED_TYPES:
         target_summary, target_warnings = _target_summary(
             df, target, resolved, requested_subtype=requested_subtype
         )
         warnings.extend(target_warnings)
+        if target_summary["readiness"] == "unlabeled":
+            plan = _automatic_assessment(
+                df, report, features=features, target=target, target_summary=target_summary
+            )
+            plan.update({
+                "problem_type": resolved,
+                "target": target,
+                "target_summary": target_summary,
+                "inferred": inferred,
+                "inference_reason": inference_reason,
+                "warnings": warnings + plan["warnings"],
+                "supervised_unavailable": True,
+            })
+            return plan
 
-    results = report.get("results", {})
     if (
         target is not None
         and results.get("schema", {}).get(target, {}).get("role") == "id_candidate"
@@ -547,12 +844,17 @@ def build_ml_plan(df, report, target=None, problem_type=None, features=None):
                 "Feature(s) with near-perfect correlation to the target need leakage review: {}."
                 .format(near_perfect)
             )
+        temporal_features = [
+            feature for feature in selected_features
+            if _has_name_hint(feature, _TEMPORAL_NAME_HINTS)
+        ]
+        if temporal_features:
+            warnings.append(
+                "Temporal feature(s) detected: {}. Use time-aware validation when row order can reveal future information."
+                .format(temporal_features)
+            )
 
-    selected_results = {
-        key: ({col: value for col, value in value.items() if col in selected_features}
-              if key in ("missing", "outliers", "stats", "schema", "correlation") else value)
-        for key, value in results.items()
-    }
+    selected_results = _selected_results(results, selected_features)
     profile = _profile(
         feature_df,
         selected_results.get("stats", {}),
@@ -588,6 +890,8 @@ def build_ml_plan(df, report, target=None, problem_type=None, features=None):
         "preprocessing": _preprocessing(resolved, profile, target_summary),
         "evaluation": _evaluation(resolved, target_summary),
         "warnings": warnings,
+        "assessment": None,
+        "supervised_unavailable": False,
         "supported_problem_types": list(PROBLEM_TYPES),
     }
 
@@ -595,6 +899,19 @@ def build_ml_plan(df, report, target=None, problem_type=None, features=None):
 def _stars(score):
     full = int(math.floor(score + 0.5))
     return "★" * full + "☆" * (5 - full)
+
+
+def _readiness_label(value):
+    return {
+        "ready": "Ready",
+        "partial": "Partial labels",
+        "limited": "Limited labels",
+        "unlabeled": "No labels",
+        "high": "High",
+        "moderate": "Moderate",
+        "low": "Low",
+        "not_assessed": "No likely target",
+    }.get(value, str(value).replace("_", " ").title())
 
 
 def format_ml_plan(plan):
@@ -605,12 +922,65 @@ def format_ml_plan(plan):
     print("{}{}  NowEDA · Task-Aware ML Guidance{}".format(bold, cyan, reset))
     print("{}{}{}{}".format(bold, cyan, bar, reset))
 
-    if plan["problem_type"] is None:
-        print("\n  No ML objective selected. Available problem types:")
-        for value in plan["supported_problem_types"]:
-            requirement = " + target" if value in ("classification", "regression") else ""
-            print("    • {}{}".format(value, requirement))
-        print("\n  Example: df.eda.mlall(target='label', problem_type='classification')")
+    assessment = plan.get("assessment")
+    if assessment is not None:
+        print("\n  {}Dataset ML assessment{}".format(bold, reset))
+        print("  Usable features: {}".format(len(assessment["usable_features"])))
+        print("  Supervised readiness: {}".format(
+            _readiness_label(assessment["supervised_readiness"])
+        ))
+        print("  Unsupervised readiness: {}".format(
+            _readiness_label(assessment["unsupervised_readiness"])
+        ))
+        if plan["target"] is not None:
+            summary = plan["target_summary"]
+            print("  Selected target: {!r}".format(plan["target"]))
+            print("  Usable labels: {} / {} ({:.1%})".format(
+                summary["usable_observations"], summary["observations"], summary["label_coverage"]
+            ))
+
+        candidates = assessment["target_candidates"]
+        if candidates:
+            print("\n  {}Potential targets — review before selecting one{}".format(bold, reset))
+            for candidate in candidates[:3]:
+                detail = candidate["problem_type"] or "labels unavailable"
+                print("    • {!r}: {} labels ({:.1%}), {}, {}".format(
+                    candidate["column"],
+                    candidate["usable_observations"],
+                    candidate["label_coverage"],
+                    detail,
+                    _readiness_label(candidate["readiness"]),
+                ))
+
+        if plan.get("supervised_unavailable"):
+            print("\n  {}Requested supervised task is not ready{}".format(yellow, reset))
+            print("  No labeled observations are available for the selected target.")
+
+        if assessment["directions"]:
+            print("\n  {}Recommended analytical directions (estimated fit){}".format(bold, reset))
+            print("  " + "-" * 62)
+            for direction in assessment["directions"]:
+                print("\n  {}{}{}".format(bold, direction["problem_type"], reset))
+                print("    {}Estimated fit:{} {} ({:.1f}/5)".format(
+                    cyan, reset, _stars(direction["score"]), direction["score"]
+                ))
+                print("    {}Why:{} {}".format(green, reset, direction["reason"]))
+                top = direction["recommendations"][0]
+                print("    {}Start with:{} {}".format(green, reset, top["name"]))
+
+        if plan["warnings"]:
+            print("\n  {}Review before modeling:{}".format(yellow, reset))
+            for warning in plan["warnings"]:
+                print("    • {}".format(warning))
+
+        if plan["preprocessing"]:
+            print("\n  {}Preparation{}".format(bold, reset))
+            print("  " + "-" * 62)
+            for index, step in enumerate(plan["preprocessing"], 1):
+                print("    {}. {}".format(index, step))
+
+        print("\n  Select target= for supervised guidance, or problem_type= for a focused unsupervised review.")
+        print("  Guidance is based on data characteristics; no models were trained or measured.")
         print("{}{}{}\n".format(cyan, bar, reset))
         return
 

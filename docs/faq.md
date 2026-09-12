@@ -80,16 +80,17 @@ the inference so you can override it.
 
 **Q: What happens if I call `df.noweda.mlall()` with no arguments?**
 
-It lists the five supported objectives: classification, regression, clustering,
-anomaly detection, and dimensionality reduction. It does not rank a mixture of
-unrelated algorithms.
+It assesses the dataset first. The output shows possible target candidates for
+review, supervised and unsupervised readiness, likely identifiers, and ranked
+unsupervised directions. It does not silently choose a target or mix supervised
+algorithms into an unsupervised ranking.
 
 ---
 
 **Q: Are the recommended algorithms expected to be the best performers?**
 
 No. They are task-specific candidates based on data characteristics. NowEDA does
-not fit or evaluate models in `ml_plan()` or `mlall()`. Stars and `/5` values are
+not fit or evaluate models in `mlall()`. Stars and `/5` values are
 estimated dataset-fit ratings, not expected accuracy. The output includes suitable
 validation approaches, metrics, preprocessing, and cautions so you can compare the
 candidates without leakage.

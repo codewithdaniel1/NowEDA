@@ -142,25 +142,47 @@ def get_transformation_suggestion(col):
     return None
 
 
-def cardinality_warning(col):
-    """Return warning if categorical column has problematic cardinality."""
-    if col.dtype.kind not in ('O',):
+def cardinality_warning(col, role="unknown", pii_types=None):
+    """Return role-aware guidance for unusually unique fields.
+
+    High uniqueness has different meanings for identifiers, PII, temporal values,
+    free text, and genuine categories.  This helper deliberately avoids presenting
+    a generic categorical-encoding recommendation for all object columns.
+    """
+    n_unique = col.nunique()
+    if n_unique <= 100:
         return None
 
-    n_unique = col.nunique()
-    n_total = len(col)
-
-    if n_unique > 1000:
-        return "very high cardinality (>1000) — consider target encoding or dropping"
-    elif n_unique > 100:
-        return "high cardinality (>100) — one-hot encoding may create too many features"
-
+    severity = "very high" if n_unique > 1000 else "high"
+    if pii_types:
+        labels = ", ".join(sorted(map(str, pii_types)))
+        return (
+            "{}-cardinality PII ({}) — mask or remove before sharing and exclude "
+            "from model features unless it is explicitly justified."
+        ).format(severity, labels)
+    if role == "id_candidate":
+        return "{}-cardinality likely identifier — exclude from model features.".format(severity)
+    if role == "datetime":
+        return (
+            "{}-cardinality temporal field — parse as datetime and derive temporal "
+            "features; do not treat it as a categorical feature."
+        ).format(severity)
+    if role == "text":
+        return (
+            "{}-cardinality text — determine whether it is free text or a code; "
+            "avoid one-hot encoding by default."
+        ).format(severity)
+    if role in ("categorical", "categorical_numeric"):
+        return (
+            "{}-cardinality categorical feature — one-hot encoding may create too "
+            "many features; choose an encoding using leakage-safe validation."
+        ).format(severity)
     return None
 
 
-def rare_category_detection(col, threshold=0.01):
-    """Detect rare categories (< threshold % of data)."""
-    if col.dtype.kind not in ('O',):
+def rare_category_detection(col, threshold=0.01, role="unknown"):
+    """Detect rare values only for inferred categorical features."""
+    if role not in ("categorical", "categorical_numeric"):
         return {}
 
     col_clean = col.dropna()

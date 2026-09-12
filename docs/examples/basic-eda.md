@@ -187,10 +187,11 @@ Suppose the goal is to predict `flag`. Name it as the target so NowEDA can give
 classification-specific guidance and exclude it from feature diagnostics:
 
 ```python
-plan = df_clean.noweda.ml_plan(
+plan = df_clean.noweda.mlall(
     target="flag",
     problem_type="classification",
     features=["age", "salary", "department", "join_date", "score"],
+    plan=True,
 )
 
 print(plan["problem_subtype"])

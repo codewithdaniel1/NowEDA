@@ -5,7 +5,7 @@ import pytest
 
 import noweda
 from noweda.ml_recommendations import _profile
-from noweda.ml_utils import cramers_v
+from noweda.ml_utils import cardinality_warning, cramers_v, rare_category_detection
 from noweda.plugins import PIIDetectorPlugin, SchemaPlugin, EncodingDetectionPlugin
 
 
@@ -163,6 +163,38 @@ def test_printed_nullable_report(capsys):
     df = pd.DataFrame({"a": pd.Series([1, None], dtype="Int64")})
     df.eda.statsall()
     assert "Full Statistical Report" in capsys.readouterr().out
+
+
+def test_feature_review_uses_schema_and_pii_roles(capsys):
+    size = 240
+    df = pd.DataFrame({
+        "customer_id": np.arange(size),
+        "email": ["person{}@example.com".format(index) for index in range(size)],
+        "account_balance": np.linspace(10.0, 500.0, size),
+        "signup_date": pd.date_range("2025-01-01", periods=size).astype(str),
+        "notes": ["unique note {}".format(index % 120) for index in range(size)],
+    })
+
+    df.eda.statsall()
+    output = capsys.readouterr().out
+    review = output.split("Feature Review", 1)[1].split("Missing Data Strategy", 1)[0]
+
+    assert "likely identifier" in review
+    assert "PII (email)" in review
+    assert "temporal field" in review
+    assert "high-cardinality text" in review
+    assert "account_balance" not in review
+    assert "target encoding or dropping" not in output
+    assert "Rare Categories Detected" not in output
+
+
+def test_role_aware_cardinality_helpers_skip_numeric_and_text_rare_values():
+    numeric = pd.Series(np.linspace(0.0, 1.0, 120))
+    text = pd.Series(["note {}".format(index) for index in range(120)])
+
+    assert cardinality_warning(numeric, role="numeric") is None
+    assert "high-cardinality text" in cardinality_warning(text, role="text")
+    assert rare_category_detection(text, role="text") == {}
 
 
 def test_unused_target_categories_do_not_create_imbalance():

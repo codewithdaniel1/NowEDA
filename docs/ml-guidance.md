@@ -1,20 +1,41 @@
 # Task-Aware ML Guidance
 
-NowEDA recommends candidate methods only after you identify the ML objective. A
-target column describes what to predict, and that intent cannot be determined
-reliably from column statistics alone.
+`df.noweda.mlall()` is NowEDA's single ML guidance method. It prints an
+explainable assessment and never fits a model or reports estimated accuracy.
+Set `plan=True` when code needs the same structured result.
 
-`mlall()` prints guidance for people. `ml_plan()` returns the same information as
-a dictionary for notebooks, applications, and automated checks. Neither method
-fits a model or reports estimated performance. Stars and `/5` values summarize a
-estimated dataset-fit score within the chosen task.
+```python
+plan = df.noweda.mlall(target="fraud_flag", plan=True)
+print(plan["recommendations"])
+```
+
+Stars and `/5` values are estimated dataset-fit scores within an analytical task.
+They are not cross-validation results or predictions of which model will win.
+
+## Start with the dataset
+
+Call `mlall()` without arguments when you have a dataset but do not yet know the
+right objective:
+
+```python
+df.noweda.mlall()
+```
+
+NowEDA reports usable features, likely identifiers, possible target candidates,
+supervised readiness, unsupervised readiness, and ranked directions for clustering,
+anomaly detection, and dimensionality reduction. Potential targets are name- and
+value-based hints only. NowEDA does not select one for you.
+
+Likely identifiers and possible target columns are excluded from the automatic
+unsupervised feature set. If fewer than two usable features remain, NowEDA explains
+why it cannot give meaningful unsupervised guidance.
 
 ## Supported problem types
 
 | `problem_type` | Target required? | What NowEDA provides |
 |---|---:|---|
-| `classification` | Yes | Binary or multiclass candidates, class checks, stratified validation and classification metrics |
-| `regression` | Yes | Continuous-outcome candidates, target checks, regression validation and metrics |
+| `classification` | Yes | Binary or multiclass candidates, label checks, stratified validation and classification metrics |
+| `regression` | Yes | Continuous-outcome candidates, label checks, regression validation and metrics |
 | `clustering` | No | Clustering candidates, scaling and cluster-stability guidance |
 | `anomaly_detection` | No | Unsupervised anomaly candidates and operational evaluation guidance |
 | `dimensionality_reduction` | No | Linear and exploratory reduction candidates with stability cautions |
@@ -29,21 +50,18 @@ regression would give misleading guidance.
 
 ## Supervised objectives
 
-Name the target whenever you want classification or regression guidance:
+Name the target when you know what you want to predict:
 
 ```python
 # Let NowEDA infer classification or regression from the target.
-plan = df.noweda.ml_plan(target="fraud_flag")
+df.noweda.mlall(target="fraud_flag")
 
-print(plan["problem_type"])
-print(plan["problem_subtype"])
-print(plan["inference_reason"])
-
-# Or state the task explicitly.
-df.noweda.mlall(
+# State the task explicitly when it is already known.
+plan = df.noweda.mlall(
     target="fraud_flag",
     problem_type="classification",
     features=["amount", "channel", "account_age_days"],
+    plan=True,
 )
 ```
 
@@ -56,23 +74,28 @@ When `problem_type` is omitted, NowEDA uses these transparent rules:
 | Low-cardinality integer values | Classification |
 | Continuous or high-cardinality numeric values | Regression |
 
-Inference is a convenience, not a statement of user intent. The returned plan
-sets `inferred=True`, includes `inference_reason`, and the printed output tells you
-to override `problem_type` when the result does not match the objective.
+It reports labeled rows, label coverage, and one of these readiness states:
 
-NowEDA rejects a missing target name, an all-missing or constant target, a
-nonnumeric regression target, and infinite regression values. It reports missing
-labels, small labeled samples, class imbalance, and classification targets with
-unusually many classes for review. Numeric features with near-perfect target
-correlation are called out for possible leakage review.
+| Readiness | Meaning |
+|---|---|
+| Ready | Enough observed labels for ordinary supervised guidance |
+| Partial labels | Some rows are unlabeled; supervised training uses labeled rows only |
+| Limited labels | Too few labeled rows or too few observations in a class for dependable validation |
+| No labels | The selected target has no observed values, so supervised training cannot begin |
 
-The target never appears in `features`. If you pass `features=`, every column must
-exist, labels must be unique within the list, and the list cannot include the
-target.
+Partial labels can make semi-supervised learning worth investigating, but NowEDA
+does not claim it is appropriate without a user objective and a separate validation
+strategy. When no labels are available, `mlall()` presents unsupervised directions
+instead of issuing supervised algorithm rankings.
+
+NowEDA rejects missing target names, constant targets, nonnumeric regression
+targets, and infinite regression values. It also flags class imbalance, likely
+identifier targets, near-perfect target correlations, and temporal features that may
+need time-aware validation.
 
 ## Unsupervised objectives
 
-Unsupervised guidance requires an explicit task and does not accept `target=`:
+Choose an explicit unsupervised task when you already know the analysis you want:
 
 ```python
 df.noweda.mlall(
@@ -80,42 +103,31 @@ df.noweda.mlall(
     features=["annual_spend", "visit_count", "account_age_days"],
 )
 
-anomaly_plan = df.noweda.ml_plan(
+anomaly_result = df.noweda.mlall(
     problem_type="anomaly_detection",
     features=["transaction_amount", "transactions_per_hour"],
+    plan=True,
 )
 ```
 
-Review likely identifiers and exclude any fields unavailable when the analysis
-will run. Distance-based, margin-based, and component-based methods generally need
-numeric scaling and an explicit strategy for categorical features and missing
-values.
+Review likely identifiers and fields unavailable when the analysis will run.
+Distance-based, margin-based, and component-based methods usually require scaling,
+categorical encoding, and a missing-data strategy. Anomalies are unusual observations;
+they are not automatically fraud, security incidents, or other business outcomes.
 
-## Structured plan
+## Structured results
 
-`ml_plan()` returns these stable top-level fields:
+With `plan=True`, `mlall()` returns these fields after printing the guidance:
 
 | Field | Meaning |
 |---|---|
-| `problem_type` | Resolved canonical objective, or `None` when none was selected |
-| `problem_subtype` | `binary`, `multiclass`, or `continuous` for supervised tasks |
+| `problem_type` / `problem_subtype` | Resolved task and supervised subtype, when selected |
 | `target` / `target_summary` | Selected target and label diagnostics |
-| `features` | Input column labels used for profiling |
-| `inferred` / `inference_reason` | Whether the task was inferred and why |
-| `recommendations` | Ranked candidates with a 1–5 heuristic `score`, `why`, and `caution` text |
-| `preprocessing` | Task-aware preparation steps |
-| `evaluation` | Validation design and appropriate metrics |
-| `warnings` | Conditions that need review before modeling |
-| `supported_problem_types` | Canonical task names accepted by this release |
+| `features` | Input features used for focused guidance, or usable automatic-assessment features |
+| `recommendations` | Ranked candidates with a 1–5 `score`, `why`, and `caution` |
+| `assessment` | No-argument readiness, possible targets, excluded IDs, and analytical directions |
+| `preprocessing` / `evaluation` | Preparation, validation design, and suitable metrics |
+| `warnings` | Conditions requiring review before modeling |
 
-Calling `mlall()` without an objective lists the supported tasks and an example.
-It does not produce a mixed algorithm ranking:
-
-```python
-df.noweda.mlall()
-```
-
-The ratings depend on dataset characteristics, but they are not accuracy,
-cross-validation results, or predictions of which model will win. Use a leakage-safe
-train/validation design, fit preprocessing only on training data, and compare the
-reported metrics for your actual decision objective.
+Use a leakage-safe train/validation design, fit preprocessing only on training data,
+and compare metrics that match the actual decision objective.
