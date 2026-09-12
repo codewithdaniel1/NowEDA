@@ -36,9 +36,9 @@ All notable changes to NowEDA are documented here.
   visible in a fixed order, using concise summaries and explicit empty states.
 - `statsall()` now lists every scaling recommendation instead of shortening the
   list, and the playground renders `insights_df()` as a left-aligned table.
-- Replaced the playground dataset with a deterministic 150,000-row synthetic
-  dataset that demonstrates the current profiling, quality, privacy, encoding,
-  and ML-guidance capabilities without using real personal data.
+- Replaced the playground dataset with a deterministic 100,000-row, 32-column
+  synthetic dataset that demonstrates the current profiling, quality, privacy,
+  encoding, and ML-guidance capabilities without using real personal data.
 - Updated package license metadata to the current PyPA format.
 
 ---
@@ -212,3 +212,16 @@ Features planned for future releases:
 
 - conda-forge package
 - Web dashboard UI
+
+### 2027 maintenance roadmap
+
+- Raise the supported Python baseline to 3.11 after Python 3.10 reaches end
+  of life, and test each maintained Python release in CI.
+- Maintain pandas 3 compatibility, especially string, categorical, datetime,
+  and missing-value inference used by NowEDA's schema rules.
+- Make large-mode samples more representative for ordered source files while
+  continuing to label estimated findings clearly.
+- Review DuckDB, PyArrow, and PySpark dependency support; keep local large-mode
+  installation straightforward and leave distributed execution opt-in.
+- Automate dependency updates and build checks, including wheel and source
+  distribution validation before releases.

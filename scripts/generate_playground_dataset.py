@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 
-ROWS = 150_000
+ROWS = 100_000
 DUPLICATE_ROWS = 300
 PREVIEW_DUPLICATE_ROWS = 25
 OUTPUT = Path(__file__).resolve().parents[1] / "test_data_large_with_pii.csv"
@@ -31,11 +31,11 @@ STATUSES = ("active", "pending", "suspended", "closed")
 SOURCES = ("organic", "email", "paid_search", "referral", "partner_beta")
 
 COLUMNS = (
-    "record_id", "customer_id", "account_id", "email", "phone", "ssn",
+    "record_id", "customer_id", "email", "phone", "ssn",
     "payment_card", "signup_timestamp", "last_login_timestamp", "event_timestamp",
     "region", "country", "acquisition_channel", "device_type", "plan_tier",
     "account_status", "churned", "fraud_flag", "account_balance", "monthly_income",
-    "credit_limit", "credit_utilization", "transaction_count",
+    "credit_limit", "transaction_count",
     "avg_transaction_amount", "lifetime_value", "account_age_days",
     "days_since_last_login", "support_tickets", "satisfaction_score",
     "promo_source", "notes", "data_source", "encoded_reference", "fraud_risk_score",
@@ -111,7 +111,6 @@ def _row(index, rng):
     return (
         "REC-{:06d}".format(customer_number),
         "CUST-{:06d}".format(customer_number),
-        "ACCT-{:07d}".format(7_000_000 + index),
         "" if index % 29 == 0 else email,
         "" if index % 17 == 0 else phone,
         "" if index % 23 == 0 else ssn,
@@ -130,7 +129,6 @@ def _row(index, rng):
         balance,
         monthly_income,
         credit_limit,
-        round(utilization, 4),
         transaction_count,
         average_transaction,
         lifetime_value,
