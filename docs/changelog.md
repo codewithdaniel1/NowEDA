@@ -8,6 +8,8 @@ All notable changes to NowEDA are documented here.
 
 ### Fixed
 
+- Restored Python 3.8-compatible build metadata so the supported legacy CI
+  environment can install NowEDA's build requirements.
 - `statsall()` now shows identifier, PII, and temporal-field guidance even on
   small datasets where high cardinality alone would not trigger a warning.
 - ML guidance uses plain-language separators in terminal and notebook output,

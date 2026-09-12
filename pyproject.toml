@@ -3,8 +3,8 @@ name = "noweda"
 dynamic = ["version"]
 description = "Automated EDA with insights, scoring, and security-aware detection — built as a native pandas extension."
 readme = { file = "README.md", content-type = "text/markdown" }
-license = "MIT"
-license-files = ["LICENSE"]
+# Table syntax retains source-build compatibility with Python 3.8 setuptools.
+license = { text = "MIT" }
 requires-python = ">=3.8"
 authors = [{ name = "Daniel Peng", email = "danielpeng95@gmail.com" }]
 keywords = ["eda", "data-analysis", "pandas", "data-quality", "pii-detection", "automated-eda", "profiling"]
@@ -57,7 +57,7 @@ Repository = "https://github.com/codewithdaniel1/NowEDA"
 noweda = "noweda.cli:main"
 
 [build-system]
-requires = ["setuptools>=77", "wheel"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -66,3 +66,6 @@ include = ["noweda*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "noweda._version.__version__" }
+
+[tool.setuptools]
+license-files = ["LICENSE"]
