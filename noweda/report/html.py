@@ -126,6 +126,7 @@ def generate_html_report(report, output_path):
 </div>
 </body>
 </html>"""
+    html = "\n".join(line.rstrip() for line in html.splitlines()) + "\n"
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)

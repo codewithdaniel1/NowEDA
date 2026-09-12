@@ -58,9 +58,8 @@ jobs:
           from readme_renderer.markdown import render
           html = render(Path("README.md").read_text())
           assert html is not None
-          for label in ["Supervised Learning (Classification & Regression)",
-                        "Unsupervised Learning (Clustering & Dimensionality Reduction)",
-                        "Multicollinearity Guidance", "Data Preprocessing Pipeline"]:
+          for label in ["Supported problem types", "Supervised tasks",
+                        "Unsupervised tasks", "Honest guidance"]:
               assert f"<strong>{escape(label)}</strong>" in html, label
           PY
       - name: Install and smoke-test the built wheel outside the source tree

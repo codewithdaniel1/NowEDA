@@ -9,10 +9,7 @@ from noweda.ml_utils import (
     get_scaling_recommendation, get_transformation_suggestion, assess_column_quality
 )
 from noweda.temporal_utils import detect_temporal_columns, stationarity_test, detect_seasonality
-from noweda.ml_recommendations import (
-    _profile, supervised_recommendations, unsupervised_recommendations,
-    preprocessing_pipeline, format_recommendations
-)
+from noweda.ml_tasks import build_ml_plan, format_ml_plan
 from noweda.ui import loading
 
 @pd.api.extensions.register_dataframe_accessor("noweda")
@@ -1078,53 +1075,28 @@ class NowEDAAccessor:
         if figs_shown == 0:
             print("No visualizations could be generated for this dataset.")
 
-    def mlall(self, target=None):
-        """Print ML algorithm recommendations and preprocessing pipeline.
+    def ml_plan(self, target=None, problem_type=None, features=None):
+        """Return task-aware ML guidance without fitting or evaluating models.
 
-        target : optional column label
-            Classification target for class-balance checks. Omit for general
-            feature recommendations without assuming a target.
-
-        Provides:
-          - Supervised Learning recommendations with star ratings and explanations
-          - Unsupervised Learning recommendations
-          - Step-by-step preprocessing pipeline tailored to the dataset
+        Supported problem types are classification, regression, clustering,
+        anomaly_detection, and dimensionality_reduction. If target is supplied
+        without a problem type, classification or regression is inferred and the
+        reason is returned. ``features`` optionally selects input columns.
         """
         self._ensure_analyzed()
-        df = self._df
-        report = self._report
-        results = report["results"]
-        scores = report["scores"]
-        stats = results.get("stats", {})
-        schema = results.get("schema", {})
+        return build_ml_plan(
+            self._df, self._report, target=target,
+            problem_type=problem_type, features=features,
+        )
 
-        # Define colors
-        _BOLD  = "\033[1m"
-        _CYAN  = "\033[36m"
-        _GREEN = "\033[32m"
-        _YELLOW = "\033[33m"
-        _RED   = "\033[31m"
-        _RESET = "\033[0m"
-
-        # Build profile used by ML recommenders
-        profile = _profile(df, stats, schema, scores, results, target=target)
-
-        # Get recommendations
-        supervised = supervised_recommendations(profile)
-        unsupervised = unsupervised_recommendations(profile)
-        pipeline = preprocessing_pipeline(profile, df)
-
-        # Print header
-        bar = "=" * 70
-        print(f"\n{_BOLD}{_CYAN}{bar}{_RESET}")
-        print(f"{_BOLD}{_CYAN}  NowEDA · ML Algorithm Recommendations & Preprocessing{_RESET}")
-        print(f"{_BOLD}{_CYAN}{bar}{_RESET}")
-
-        # Delegate formatting to format_recommendations
-        format_recommendations(supervised, unsupervised, pipeline, profile,
-                              _BOLD, _CYAN, _GREEN, _YELLOW, _RED, _RESET)
-
-        print(f"{_CYAN}{'='*70}{_RESET}\n")
+    def mlall(self, target=None, problem_type=None, features=None):
+        """Print task-aware ML guidance; see :meth:`ml_plan` for parameters."""
+        self._ensure_analyzed()
+        plan = build_ml_plan(
+            self._df, self._report, target=target,
+            problem_type=problem_type, features=features,
+        )
+        format_ml_plan(plan)
 
     def profile_column(self, column_name):
         """Deep dive into a single column's characteristics and recommendations.
@@ -1360,6 +1332,7 @@ def _loading_message(method_name, args, kwargs):
         "statsall": "NowEDA · Building full statistical report",
         "vizall": "NowEDA · Rendering visualizations",
         "mlall": "NowEDA · Building ML recommendations",
+        "ml_plan": "NowEDA · Building ML recommendation plan",
         "compare": "NowEDA · Comparing datasets",
     }
     return messages.get(method_name, f"NowEDA · Running {method_name}")
@@ -1393,6 +1366,7 @@ for _method_name in (
     "statsall",
     "vizall",
     "mlall",
+    "ml_plan",
     "profile_column",
     "compare",
 ):

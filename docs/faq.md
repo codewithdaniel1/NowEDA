@@ -61,6 +61,49 @@ report = df.noweda.refresh()
 
 ---
 
+## ML Guidance
+
+**Q: How does NowEDA know which column is the target?**
+
+It does not choose one silently. The target represents what you want to predict,
+so supervised guidance requires you to name it:
+
+```python
+df.noweda.mlall(target="fraud_flag", problem_type="classification")
+```
+
+If you omit `problem_type` but provide `target`, NowEDA infers classification or
+regression from the target dtype and number of distinct values. The result explains
+the inference so you can override it.
+
+---
+
+**Q: What happens if I call `df.noweda.mlall()` with no arguments?**
+
+It lists the five supported objectives: classification, regression, clustering,
+anomaly detection, and dimensionality reduction. It does not rank a mixture of
+unrelated algorithms.
+
+---
+
+**Q: Are the recommended algorithms expected to be the best performers?**
+
+No. They are task-specific candidates based on data characteristics. NowEDA does
+not fit or evaluate models in `ml_plan()` or `mlall()`. Stars and `/5` values are
+estimated dataset-fit ratings, not expected accuracy. The output includes suitable
+validation approaches, metrics, preprocessing, and cautions so you can compare the
+candidates without leakage.
+
+---
+
+**Q: Does NowEDA support forecasting?**
+
+Not yet. Forecasting needs a time column, forecast horizon, optional series ID, and
+time-aware validation. NowEDA raises a clear error instead of treating forecasting
+as ordinary regression.
+
+---
+
 ## Formats
 
 **Q: My file has a `.txt` extension but it's tab-separated. How do I load it?**

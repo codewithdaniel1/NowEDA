@@ -105,7 +105,36 @@ report = df.noweda.report()
 
 ---
 
-## Step 4 — Export a report
+## Step 4 — Get task-aware ML guidance
+
+NowEDA needs your objective before it can recommend relevant candidate methods.
+For supervised work, name the target:
+
+```python
+# Infers classification or regression and explains the inference.
+plan = df.noweda.ml_plan(target="fraud_flag")
+print(plan["problem_type"], plan["inference_reason"])
+
+# Printed guidance with an explicit task.
+df.noweda.mlall(target="fraud_flag", problem_type="classification")
+```
+
+For an unsupervised objective, omit the target:
+
+```python
+df.noweda.mlall(
+    problem_type="clustering",
+    features=["annual_spend", "visit_count"],
+)
+```
+
+The stars and `/5` scores are estimated dataset-fit ratings, not measured model
+performance. See
+[Task-Aware ML Guidance](ml-guidance.md) for supported tasks and validation rules.
+
+---
+
+## Step 5 — Export a report
 
 ### HTML report (shareable, dark-themed)
 
@@ -130,7 +159,7 @@ noweda data.csv --json my_report.json
 
 ---
 
-## Step 5 — Use selectively (run specific plugins only)
+## Step 6 — Use selectively (run specific plugins only)
 
 You don't have to run all plugins. Compose exactly what you need:
 
@@ -152,6 +181,7 @@ print(report["results"]["pii"])
 
 - [Reading Data](user-guide/reading-data.md) — all 28 supported formats
 - [The NowEDA Accessor](user-guide/accessor.md) — full `df.noweda.*` API
+- [Task-Aware ML Guidance](ml-guidance.md) — targets, problem types, and validation
 - [Plugin Reference](plugins/overview.md) — what each plugin detects and how
 - [Scoring System](scoring.md) — how scores are calculated
 - [Writing Custom Plugins](plugins/custom.md) — extend NowEDA for your use case

@@ -63,6 +63,7 @@ nav:
   - User Guide:
     - Reading Data: user-guide/reading-data.md
     - The NowEDA Accessor: user-guide/accessor.md
+    - Task-Aware ML Guidance: ml-guidance.md
     - Understanding Reports: user-guide/reports.md
   - Plugins:
     - Overview: plugins/overview.md

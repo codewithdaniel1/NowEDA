@@ -16,6 +16,7 @@ Most EDA tools give you charts and tables. NowEDA gives you **answers**.
 | Show missing value counts | "Column 'email' is 32% missing — imputation recommended" |
 | Show correlation matrix | "Very strong correlation (0.99) between 'age' and 'salary' — one may be redundant" |
 | No security awareness | "Column 'email' contains 17 PII email addresses — mask before sharing" |
+| Mix unrelated ML algorithms | Task-aware candidates for your selected target and problem type |
 | Requires specific file format | Works with 28 file extensions out of the box |
 
 ---
@@ -49,6 +50,9 @@ print(df.noweda.insights())   # human-readable insight list
 print(df.noweda.score())      # data_quality, risk, model_readiness
 print(df.noweda.summary())    # raw results from every plugin
 report = df.noweda.report()   # everything in one structured dict
+
+# State the target or unsupervised objective before requesting ML guidance
+df.noweda.mlall(target="fraud_flag", problem_type="classification")
 ```
 
 **Example output:**

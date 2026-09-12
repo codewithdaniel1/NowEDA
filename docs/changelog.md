@@ -4,6 +4,33 @@ All notable changes to NowEDA are documented here.
 
 ---
 
+## [0.1.5] — 2026-09-12
+
+### Added
+
+- Added `ml_plan(target=None, problem_type=None, features=None)` for structured,
+  task-aware ML guidance and expanded `mlall()` to accept the same arguments.
+- Added classification, regression, clustering, anomaly-detection, and
+  dimensionality-reduction plans with task-specific preprocessing, validation,
+  metrics, and cautions.
+- Added target validation, binary/multiclass subtype detection, transparent
+  classification/regression inference, explicit feature selection, and warnings
+  for missing labels, small samples or classes, class imbalance, likely
+  identifiers, possible target leakage, and ambiguous targets.
+
+### Changed
+
+- `mlall()` without an objective now lists the supported problem types instead of
+  presenting a mixed ranking of supervised and unsupervised algorithms.
+- ML stars and `/5` scores now represent estimated dataset fit within the selected
+  task and are clearly separated from measured model performance. NowEDA does not
+  fit models in this workflow.
+- Documented the ML objective contract throughout the README, website, API reference,
+  FAQ, examples, and playground. Forecasting remains separate until NowEDA can accept
+  time columns, horizons, series identifiers, and time-aware validation.
+
+---
+
 ## [0.1.4] — 2026-09-08
 
 ### Fixed

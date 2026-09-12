@@ -192,6 +192,31 @@ Use `report()` when passing data to the HTML generator, serializing to JSON, or 
 
 ---
 
+### `df.noweda.ml_plan()` and `df.noweda.mlall()`
+
+Build guidance for a specific ML objective. `ml_plan()` returns a dictionary;
+`mlall()` prints the same information with heuristic stars and `/5` dataset-fit
+scores for a terminal or notebook. No models are trained or evaluated.
+
+```python
+# The named target lets NowEDA infer classification or regression.
+plan = df.noweda.ml_plan(target="churned")
+
+# Explicit tasks are authoritative.
+df.noweda.mlall(target="churned", problem_type="classification")
+df.noweda.mlall(
+    problem_type="anomaly_detection",
+    features=["amount", "velocity", "account_age_days"],
+)
+```
+
+Supervised tasks require a target and automatically exclude it from features.
+Unsupervised tasks do not accept a target. Calling `mlall()` without an objective
+lists all supported tasks instead of guessing. See [Task-Aware ML
+Guidance](../ml-guidance.md) for the full contract.
+
+---
+
 ### `df.noweda.statsall()`
 
 Prints a rich, colour-coded full-analysis report to the terminal or Jupyter notebook. Combines everything in one call — no assembly required.

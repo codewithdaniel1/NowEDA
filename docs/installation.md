@@ -101,7 +101,7 @@ pip install pytest mkdocs mkdocs-material
 
 ```python
 import noweda as eda
-print(eda.__version__)   # 0.1.4
+print(eda.__version__)   # 0.1.5
 
 import pandas as pd
 df = pd.DataFrame({"x": [1, 2, 3]})

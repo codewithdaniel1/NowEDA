@@ -170,14 +170,41 @@ Returns `None`; charts are rendered inline (Jupyter) or displayed in a window (t
 
 Forces fresh analysis and returns the complete report dictionary.
 
-### `df.noweda.mlall(target=None)`
+### `df.noweda.ml_plan(target=None, problem_type=None, features=None)`
 
-Prints heuristic model and preprocessing recommendations. For classification,
-pass the target column label, e.g. `df.noweda.mlall(target="segment")`. The target
-is excluded from feature diagnostics. An observed largest/smallest class count
-ratio greater than 2 triggers a class-balance warning. Numeric labels are allowed;
-omit the target for regression guidance without class-balance checks. Without a
-target, no class-balance check is performed.
+Returns task-aware ML guidance as a dictionary without fitting models. Supported
+problem types are `classification`, `regression`, `clustering`,
+`anomaly_detection`, and `dimensionality_reduction`.
+
+Classification and regression require `target`. When a target is supplied without
+`problem_type`, NowEDA infers classification or regression from target dtype and
+cardinality and includes the reason in the result. Unsupervised tasks reject a
+target. `features` optionally limits which input columns are profiled; it cannot
+contain the target.
+
+```python
+plan = df.noweda.ml_plan(target="segment")
+plan = df.noweda.ml_plan(
+    problem_type="clustering",
+    features=["age", "income"],
+)
+```
+
+The returned fields are `problem_type`, `problem_subtype`, `target`,
+`target_summary`, `features`, `inferred`, `inference_reason`, `recommendations`,
+`preprocessing`, `evaluation`, `warnings`, and `supported_problem_types`.
+Each recommendation contains `name`, `score`, `why`, and `caution`; `score` is a
+1–5 estimated dataset-fit value rather than measured model performance.
+
+### `df.noweda.mlall(target=None, problem_type=None, features=None)`
+
+Prints the same plan with task-specific candidate methods, heuristic stars and
+`/5` dataset-fit scores, cautions, preprocessing, validation, and metrics. No
+models are trained or evaluated. With no objective, the method lists the supported
+problem types instead of recommending unrelated algorithms.
+
+See [Task-Aware ML Guidance](ml-guidance.md) for inference rules, validation, and
+complete examples.
 
 ### Table schemas
 

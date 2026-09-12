@@ -54,33 +54,49 @@ outliers, and preprocessing suggestions. VIF uses multivariate regression
 in the standard install. Optional `noweda[ml]` dependencies add time-series
 diagnostics. Constant columns and insufficient observations yield unavailable VIF.
 
-### 2. `df.eda.mlall()` — ML recommendations and preprocessing guidance
+### 2. `df.eda.mlall()` — Task-aware ML guidance
 
-Heuristic recommendations help choose starting points for experimentation.
-Ratings are not measured model performance or guarantees of model readiness.
+NowEDA asks for the prediction or analysis objective before recommending methods.
+It does not silently choose a target or mix unrelated supervised and unsupervised
+algorithms into one ranking.
 
-**Supervised Learning (Classification & Regression)**
+```python
+# Infer binary/multiclass classification or regression from the named target.
+df.eda.mlall(target="segment")
 
-- Baseline and alternative algorithms with reasons and preprocessing guidance.
-- For classification, use `df.eda.mlall(target="segment")` to check class balance.
-  The target is excluded from feature recommendations. Class imbalance is flagged
-  when the most frequent observed class has more than twice the count of the least
-  frequent observed class. Without a target, class balance is not assessed.
-- Numeric targets are treated as class labels when supplied; omit `target` for
-  regression guidance without a class-balance check.
+# State the objective explicitly when you already know it.
+df.eda.mlall(target="segment", problem_type="classification")
+df.eda.mlall(problem_type="clustering", features=["age", "income"])
 
-**Unsupervised Learning (Clustering & Dimensionality Reduction)**
+# Get the same guidance as structured data instead of printed output.
+plan = df.eda.ml_plan(target="segment")
+```
 
-- Suggestions for clustering, dimensionality reduction, and anomaly detection.
+**Supported problem types**
 
-**Multicollinearity Guidance**
+`classification`, `regression`, `clustering`, `anomaly_detection`, and
+`dimensionality_reduction`. Binary and multiclass are classification subtypes.
+Forecasting is planned separately because it needs a time column, horizon, and
+time-aware validation.
 
-- High-correlation warnings and suggestions for feature selection or regularization.
+**Supervised tasks**
 
-**Data Preprocessing Pipeline**
+Classification and regression require `target=`. If `problem_type` is omitted,
+NowEDA infers one from the target dtype and cardinality, shows the reason, and lets
+you override it. The target is excluded from features and invalid targets fail with
+a clear error.
 
-- Suggested steps for missing values, encoding, scaling, and outliers.
-- Example snippets are guidance; adapt them to your train/test split and task.
+**Unsupervised tasks**
+
+Clustering, anomaly detection, and dimensionality reduction do not accept a target.
+Use `features=` to limit the analysis to columns available for that objective.
+
+**Honest guidance**
+
+Recommendations are task-specific candidates with preprocessing, validation,
+metrics, and cautions. Stars and `/5` values are estimated dataset-fit ratings
+within the selected task, not measured accuracy or expected performance. NowEDA
+does not train models in this step. See the [ML guidance documentation](https://codewithdaniel1.github.io/NowEDA/ml-guidance/).
 
 ### 3. `df.eda.vizall()` — Automatic charts
 
@@ -164,7 +180,7 @@ Only read Pickle files from trusted sources, since loading them can execute code
 ## Large files
 
 CSV, JSON, and all chunked reads use pandas consistently regardless of file size.
-PySpark remains a standard dependency in 0.1.4. Large Parquet/ORC files (at least
+PySpark is a standard dependency. Large Parquet/ORC files (at least
 128 MB) without reader options may use Spark, with a pandas fallback on failure.
 Spark requires a compatible Java installation. Reads with options use pandas.
 Spark loading still collects the final pandas DataFrame into local memory and

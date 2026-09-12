@@ -181,7 +181,29 @@ After cleaning: quality jumped from 77 → 95, risk dropped to 0, model readines
 
 ---
 
-## Step 8 — Export the report
+## Step 8 — Choose an ML objective
+
+Suppose the goal is to predict `flag`. Name it as the target so NowEDA can give
+classification-specific guidance and exclude it from feature diagnostics:
+
+```python
+plan = df_clean.noweda.ml_plan(
+    target="flag",
+    problem_type="classification",
+    features=["age", "salary", "department", "join_date", "score"],
+)
+
+print(plan["problem_subtype"])
+for candidate in plan["recommendations"]:
+    print(candidate["name"], "—", candidate["why"])
+```
+
+The `score` values are estimated dataset-fit ratings, not measured performance.
+Follow the returned preprocessing and validation guidance before comparing models.
+
+---
+
+## Step 9 — Export the report
 
 ```bash
 noweda employees.csv --html employees_report.html
