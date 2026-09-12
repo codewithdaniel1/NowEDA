@@ -216,7 +216,11 @@ def _assessment_features(df, selected_features, results, candidates):
         column for column in selected_features
         if column not in id_features and column not in excluded_candidates
     ]
-    return df.loc[:, usable].copy(), usable, id_features, excluded_candidates
+    # pandas 1.3 cannot select a mixed list of labels that includes a tuple via
+    # ``.loc[:, labels]``. Positional selection preserves the requested labels
+    # and works across every supported pandas version.
+    positions = [_column_position(df, column, "Feature") for column in usable]
+    return df.iloc[:, positions].copy(), usable, id_features, excluded_candidates
 
 
 def _assessment_direction(problem_type, recommendations, profile):

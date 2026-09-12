@@ -26,6 +26,11 @@ All notable changes to NowEDA are documented here.
   role, so continuous measures, dates, PII, and free text are not presented as
   ordinary categorical features.
 
+### Fixed
+
+- Automatic `mlall()` assessment supports mixed column labels, including tuple
+  labels, on pandas 1.3.
+
 ---
 
 ## [0.1.5] — 2026-09-12
