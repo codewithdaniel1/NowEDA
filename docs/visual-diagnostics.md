@@ -48,7 +48,8 @@ structure. These can include:
 - outlier prevalence;
 - feature-scale differences;
 - categorical association using Cramér's V; and
-- temporal relationships when datetime and numeric fields are available.
+- temporal relationships when datetime and numeric fields are available; and
+- an exploratory PCA projection with a K-Means preview and silhouette scores.
 
 The method excludes detected PII and likely identifier columns from feature
 diagnostics. This reduces noisy charts and helps avoid displaying sensitive
@@ -61,7 +62,10 @@ When the target is categorical, boolean, or a low-cardinality integer,
 
 - target class counts;
 - numeric distributions split by class; and
-- class shares across categorical feature values.
+- class shares across categorical feature values;
+- a one-feature logistic probability curve for binary targets; and
+- side-by-side linear and nonlinear RBF-SVM boundaries using two selected
+  numeric features.
 
 The returned evidence can flag class imbalance, weak univariate separation,
 possible leakage, approximately linear structure, and curved or threshold-like
@@ -70,6 +74,12 @@ linear structure may justify testing logistic regression or a linear SVM as a
 baseline, while threshold-like structure may justify comparing tree-based or
 nonlinear-kernel models.
 
+The SVM panels are two-feature projections. They can reveal a useful boundary,
+but they do not describe what the same estimator would learn from every
+available feature. The fit and validation score retain nonmissing finite rows;
+the displayed axes zoom to the central 98% so isolated outliers do not hide the
+boundary.
+
 ## Regression diagnostics
 
 When the target is continuous numeric data, `vizall()` adds:
@@ -77,12 +87,25 @@ When the target is continuous numeric data, `vizall()` adds:
 - the target distribution;
 - feature-versus-target scatter plots;
 - a linear trend and binned target means; and
-- mean target values across categorical feature groups.
+- mean target values across categorical feature groups; and
+- a fitted linear-regression baseline with validation residuals.
 
 Roughly straight, monotonic relationships can support a linear-regression
 baseline. Curves, thresholds, and plateaus suggest testing transformations or
 nonlinear estimators. Final selection still depends on leakage-safe validation,
 residual behavior, and prediction metrics.
+
+## Fitted visual baselines
+
+The regression, logistic, SVM, and K-Means overlays fit small diagnostic
+estimators on deterministic bounded samples. Supervised diagnostics use a
+train/validation split and display validation R² or balanced accuracy. K-Means
+compares silhouette scores over a small range of `k` values.
+
+These scores describe the displayed feature projection and sample. They are
+not expected production performance, a full benchmark, hyperparameter search,
+or permission to use a feature that will not exist at prediction time. The
+estimators are discarded after rendering.
 
 ## Returned result
 
@@ -96,6 +119,7 @@ print(visuals["problem_type"])
 print(visuals["target_summary"])
 print(visuals["associations"][:5])
 print(visuals["model_signals"])
+print(visuals["diagnostic_models"])
 print(visuals["scope"])
 
 first_figure = visuals["figures"][0]
@@ -112,6 +136,7 @@ Useful fields include:
 | `excluded_features` | Likely identifiers, detected PII, and unsupported fields omitted from feature diagnostics |
 | `plot_titles` / `figures` | Generated panel groups and Matplotlib figures |
 | `model_signals` | Cautious, data-specific interpretations for model families to validate |
+| `diagnostic_models` | Disposable fitted baseline, selected features, fitted rows, validation metric, score, and projection scope |
 | `observations` | Other findings such as imbalance or feature-scale differences |
 | `scope` | Source rows, sampled rows when applicable, and whether results are sample-based |
 | `plots_generated` / `max_plots` | Used panel count and requested panel budget |
@@ -147,14 +172,17 @@ on small differences.
 
 ## How this relates to `mlall()`
 
-`mlall(target=...)` reuses the same visual diagnostic evidence in its structured
-plan, keeping written recommendations aligned with `vizall(target=...)`:
+`mlall(target=...)` reuses the same association and model-shape evidence in its
+structured plan, keeping written recommendations aligned with
+`vizall(target=...)`:
 
 ```python
 plan = df.eda.mlall(target="fraud_flag", plan=True)
 print(plan["visual_diagnostics"]["model_signals"])
 ```
 
-Neither method trains models or reports expected accuracy. Use their output to
-choose sensible candidates and preprocessing, then compare those candidates
-with validation that matches the real prediction task.
+`mlall()` remains model-free. `vizall()` may fit the disposable visual baselines
+described above, but does not return a production estimator or claim expected
+accuracy. Use their output to choose sensible candidates and preprocessing,
+then compare those candidates with validation that matches the real prediction
+task.

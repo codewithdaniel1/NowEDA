@@ -34,9 +34,9 @@ dependencies = [
 
 [project.optional-dependencies]
 excel = ["xlrd>=2.0.1", "pyxlsb>=1.0.10", "odfpy>=1.4.1"]
-viz = ["matplotlib>=3.5", "scipy>=1.7"]
+viz = ["matplotlib>=3.5", "scipy>=1.7", "scikit-learn>=1.0"]
 ml = ["statsmodels>=0.13", "scikit-learn>=1.0"]
-test = ["pytest>=7", "odfpy>=1.4.1", "matplotlib>=3.5", "scipy>=1.7"]
+test = ["pytest>=7", "odfpy>=1.4.1", "matplotlib>=3.5", "scipy>=1.7", "scikit-learn>=1.0"]
 hdf    = ["tables>=3.7"]            # .h5, .hdf5
 spss   = ["pyreadstat>=1.1"]        # .sav, .zsav
 full   = [

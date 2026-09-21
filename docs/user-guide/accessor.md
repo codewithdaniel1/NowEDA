@@ -277,9 +277,9 @@ visuals = df.noweda.vizall(
 
 | Mode | Diagnostics |
 |---|---|
-| No target | Selected distributions, missingness, correlations, scales, outliers, categorical associations, numeric relationships, and temporal structure |
-| Classification target | Class balance plus ranked numeric and categorical class-separation diagnostics |
-| Regression target | Target distribution plus ranked scatter, linear-trend, binned-mean, and categorical group diagnostics |
+| No target | Selected distributions, missingness, correlations, scales, outliers, associations, temporal structure, and a PCA/K-Means preview |
+| Classification target | Class balance, ranked relationships, a logistic curve for binary targets, and two-feature linear/RBF-SVM boundaries |
+| Regression target | Target distribution, ranked relationships, a fitted linear baseline, and validation residuals |
 
 Likely identifiers and detected PII are excluded from feature diagnostics.
 `max_plots` counts individual chart panels, including subplots. The default is
@@ -290,12 +290,15 @@ visuals["figures"]
 visuals["selected_features"]
 visuals["associations"]
 visuals["model_signals"]
+visuals["diagnostic_models"]
 visuals["scope"]
 ```
 
 Model signals describe visible linear, nonlinear, overlap, imbalance, and
-scaling evidence. Final estimator choice still requires fitting and validation.
-Requires `matplotlib` through `noweda[viz]`.
+scaling evidence. Fitted overlays are bounded, disposable diagnostics whose
+scores apply only to the displayed projection. Final estimator choice still
+requires a complete leakage-safe validation design. Requires `matplotlib` and
+scikit-learn through `noweda[viz]`.
 
 See [Visual ML Diagnostics](../visual-diagnostics.md) for the complete result
 schema, classification and regression behavior, sampling, and interpretation

@@ -80,10 +80,11 @@ visuals = df.noweda.vizall(target="churned", max_plots=15)
 
 Install `noweda[viz]` for charts. `vizall()` ranks useful fields, excludes
 likely identifiers and detected PII, and returns the figures and evidence used
-to select them. The charts suggest model families to validate; they do not
-measure model performance. Use `profile_column("column_name")` when a single
-field needs deeper inspection. The [visual diagnostics guide](visual-diagnostics.md)
-documents the returned evidence, plot budget, and large-mode sampling behavior.
+to select them. Applicable fitted overlays report validation scores for their
+small displayed projection; they do not estimate final model performance. Use
+`profile_column("column_name")` when a single field needs deeper inspection.
+The [visual diagnostics guide](visual-diagnostics.md) documents the returned
+evidence, plot budget, and large-mode sampling behavior.
 
 ### Advanced: extract insight strings
 

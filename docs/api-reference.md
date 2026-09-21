@@ -174,10 +174,12 @@ adds classification or regression diagnostics.
 Possible output includes target balance or distribution, ranked feature-target
 relationships, selected distributions, missingness, correlations, outlier
 prevalence, feature-scale comparison, categorical associations, numeric
-relationships, and temporal structure.
+relationships, temporal structure, logistic curves, linear-regression residuals,
+two-feature SVM boundaries, and PCA-projected K-Means diagnostics.
 
 Returns a concise dictionary-like `VizResult` containing `figures`,
-`plot_titles`, `selected_features`, `associations`, `model_signals`, and `scope`.
+`plot_titles`, `selected_features`, `associations`, `model_signals`,
+`diagnostic_models`, and `scope`.
 The figures render inline in Jupyter or open in a window from a terminal.
 See [Visual ML Diagnostics](visual-diagnostics.md) for the full returned schema,
 sampling behavior, and interpretation guidance.

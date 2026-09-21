@@ -139,6 +139,8 @@ missingness, outliers, feature scales, and applicable temporal plots. Supply the
 prediction target to add classification or regression diagnostics. NowEDA ranks
 useful features, excludes likely identifiers and detected PII, and describes
 model-family signals without claiming that a chart proves the best model.
+Where applicable, it fits bounded visual baselines for linear regression,
+logistic probability, linear and nonlinear SVM boundaries, and K-Means.
 
 ```python
 df.eda.vizall()  # General and unsupervised structure
@@ -148,6 +150,7 @@ visuals = df.eda.vizall(
     max_plots=15,
 )
 print(visuals["model_signals"])
+print(visuals["diagnostic_models"])
 
 df.eda.vizall(sample=5_000)  # Optional bounded sample
 ```
@@ -220,7 +223,7 @@ df = eda.read("data.csv", dtype={"customer_id": str})
 | Parquet, Feather, ORC | Included with `pip install noweda` |
 | HDF5 | `pip install "noweda[hdf]"` |
 | SPSS | `pip install "noweda[spss]"` |
-| Charts and KDE overlays | `pip install "noweda[viz]"` |
+| Charts, KDE overlays, and fitted visual diagnostics | `pip install "noweda[viz]"` |
 | Stationarity and seasonality dependencies | `pip install "noweda[ml]"` |
 | All optional analysis and format dependencies | `pip install "noweda[full]"` |
 

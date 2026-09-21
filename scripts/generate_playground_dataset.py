@@ -9,6 +9,7 @@ used.
 
 import base64
 import csv
+import math
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -61,6 +62,14 @@ def _timestamp(value):
     return value.isoformat(timespec="seconds")
 
 
+def _sigmoid(value):
+    """Return a numerically stable logistic probability."""
+    if value >= 0:
+        return 1.0 / (1.0 + math.exp(-value))
+    exponent = math.exp(value)
+    return exponent / (1.0 + exponent)
+
+
 def _row(index, rng):
     customer_number = 1_000_000 + index
     first = rng.choice(FIRST_NAMES)
@@ -73,26 +82,97 @@ def _row(index, rng):
     ssn = "{:03d}-{:02d}-{:04d}".format(900 + index % 100, index % 100, index % 10000)
     signup = datetime(2019, 1, 1) + timedelta(days=index % 2_000, hours=index % 24)
     event = datetime(2026, 1, 1) + timedelta(minutes=index * 11)
-    days_since_login = rng.choices((0, 1, 2, 7, 14, 30, 90), (26, 18, 15, 14, 11, 9, 7))[0]
+    # A latent behavioral group creates realistic unsupervised structure without
+    # exposing a synthetic "correct cluster" label to the playground user.
+    behavior = rng.choices(("casual", "steady", "power"), (34, 46, 20))[0]
+    behavior_profile = {
+        "casual": {
+            "income_log": 10.45, "transactions": 42, "transaction_sd": 14,
+            "amount_log": 3.30, "tickets": 0.50, "satisfaction": 3.05,
+            "login_weights": (15, 13, 13, 18, 17, 14, 10),
+            "tiers": (65, 25, 8, 2),
+        },
+        "steady": {
+            "income_log": 10.85, "transactions": 125, "transaction_sd": 24,
+            "amount_log": 3.85, "tickets": 0.42, "satisfaction": 3.85,
+            "login_weights": (26, 21, 17, 15, 10, 7, 4),
+            "tiers": (18, 52, 24, 6),
+        },
+        "power": {
+            "income_log": 11.25, "transactions": 235, "transaction_sd": 32,
+            "amount_log": 4.45, "tickets": 0.34, "satisfaction": 4.35,
+            "login_weights": (39, 25, 17, 10, 5, 3, 1),
+            "tiers": (4, 20, 48, 28),
+        },
+    }[behavior]
+    days_since_login = rng.choices(
+        (0, 1, 2, 7, 14, 30, 90), behavior_profile["login_weights"]
+    )[0]
     last_login = event - timedelta(days=days_since_login, hours=rng.randrange(24))
 
-    churned = int(rng.random() < 0.16)
-    fraud = int(rng.random() < 0.035)
+    monthly_income = round(
+        rng.lognormvariate(behavior_profile["income_log"], 0.30), 2
+    )
+    credit_limit = round(monthly_income * 2.35 + rng.gauss(0, 50), 2)
+    utilization_shape = {
+        "casual": (2.7, 4.8), "steady": (2.2, 5.5), "power": (1.8, 6.3)
+    }[behavior]
+    utilization = min(1.65, max(0, rng.betavariate(*utilization_shape)))
+    balance = round(credit_limit * utilization + rng.gauss(0, 110), 2)
+    transaction_count = max(
+        0,
+        int(rng.gauss(
+            behavior_profile["transactions"], behavior_profile["transaction_sd"]
+        )),
+    )
+    average_transaction = round(
+        max(1, rng.lognormvariate(behavior_profile["amount_log"], 0.34)), 2
+    )
+    account_age = (event.date() - signup.date()).days
+    tickets = min(15, int(rng.expovariate(behavior_profile["tickets"])))
+    satisfaction = round(max(
+        1,
+        min(5, rng.gauss(behavior_profile["satisfaction"] - 0.08 * tickets, 0.48)),
+    ), 1)
+
+    # Churn follows an interpretable logistic relationship. Transaction volume
+    # and satisfaction create a useful linear-classifier baseline; inactivity
+    # and support demand add overlap so the result is not artificially perfect.
+    churn_logit = (
+        -1.40
+        - 0.018 * (transaction_count - 85)
+        - 0.95 * (satisfaction - 3.2)
+        + 0.024 * days_since_login
+        + 0.10 * tickets
+    )
+    churned = int(rng.random() < _sigmoid(churn_logit))
     status = "closed" if churned and rng.random() < 0.55 else rng.choices(
         STATUSES, (78, 10, 7, 5)
     )[0]
-    monthly_income = round(rng.lognormvariate(10.85, 0.48), 2)
-    credit_limit = round(monthly_income * 2.35 + rng.gauss(0, 50), 2)
-    utilization = min(1.65, max(0, rng.betavariate(2.2, 5.5)))
-    balance = round(credit_limit * utilization + rng.gauss(0, 110), 2)
-    transaction_count = max(0, int(rng.gauss(55 if churned else 135, 38)))
-    average_transaction = round(max(1, rng.lognormvariate(3.65, 0.72)), 2)
-    lifetime_value = round(monthly_income * (14 + index % 54) + balance * 0.55, 2)
-    account_age = (event.date() - signup.date()).days
-    tickets = min(15, int(rng.expovariate(0.42)))
-    satisfaction = round(max(1, min(5, rng.gauss(3.8 - churned * 1.25, 0.8))), 1)
+
+    # Fraud contains a curved two-feature boundary. The post-outcome risk score
+    # below remains intentionally leaky so NowEDA can demonstrate that warning.
+    transaction_signal = (transaction_count - 125.0) / 72.0
+    amount_signal = (math.log(max(average_transaction, 1.0)) - 3.85) / 0.58
+    risk_radius = transaction_signal ** 2 + amount_signal ** 2
+    fraud_probability = 0.006 + 0.32 * _sigmoid(2.4 * (risk_radius - 5.0))
+    fraud = int(rng.random() < min(fraud_probability, 0.70))
+
+    # A mostly linear continuous target supports regression diagnostics while
+    # retaining enough noise for honest residual and validation examples.
+    lifetime_value = round(max(
+        0,
+        48 * transaction_count
+        + 7.5 * account_age
+        + 11 * average_transaction
+        + 0.035 * monthly_income
+        + rng.gauss(0, 2_500),
+    ), 2)
     promo_source = "partner_beta" if index % 401 == 0 else rng.choice(SOURCES[:-1])
-    fraud_risk = round(min(100, max(0, fraud * 88 + rng.gauss(6, 3))), 2)
+    fraud_risk = round(min(
+        100,
+        max(0, fraud * 82 + 2.4 * risk_radius + rng.gauss(4, 3)),
+    ), 2)
 
     # A small, intentional outlier rate makes IQR detection visible.
     if index % 173 == 0:
@@ -122,7 +202,7 @@ def _row(index, rng):
         rng.choice(COUNTRIES),
         rng.choice(CHANNELS),
         rng.choice(DEVICES),
-        rng.choice(TIERS),
+        rng.choices(TIERS, behavior_profile["tiers"])[0],
         status,
         "yes" if churned else "no",
         fraud,

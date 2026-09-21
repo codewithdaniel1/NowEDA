@@ -21,7 +21,7 @@ sample for exploratory work. The next reliability-focused release should:
 - speed up CI with dependency caching and update GitHub Actions to remove
   runtime deprecation notices.
 
-These improvements remain deferred and are outside the v0.2.2 visualization
+These improvements remain deferred and are outside the current visualization
 scope.
 
 ## 2027 maintenance roadmap

@@ -732,7 +732,9 @@ class NowEDAAccessor:
         ``vizall()`` selects a bounded set of general diagnostics. Supplying a
         target adds supervised feature-versus-target charts while preserving
         the existing workflow. The returned dictionary-like result contains
-        the figures, ranked evidence, selected features, and scope metadata.
+        the figures, ranked evidence, selected features, fitted diagnostic
+        baselines, and scope metadata. These bounded visual fits are examples
+        for comparison rather than final model recommendations.
 
         Parameters
         ----------

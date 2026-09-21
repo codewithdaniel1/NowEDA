@@ -13,7 +13,7 @@ Stars and `/5` values are estimated dataset-fit scores within an analytical task
 They are not cross-validation results or predictions of which model will win.
 
 Use `vizall(target=...)` to inspect the visual evidence behind model-family
-signals before fitting candidates:
+signals and optional fitted visual baselines before a full modeling workflow:
 
 ```python
 visuals = df.noweda.vizall(target="fraud_flag", max_plots=15)
@@ -21,7 +21,8 @@ print(visuals["model_signals"])
 ```
 
 When a target is supplied, `mlall()` reuses the same diagnostic evidence so its
-written guidance stays aligned with the charts. See
+written guidance stays aligned with the charts. `mlall()` itself remains
+model-free; any disposable fitted overlays belong to `vizall()`. See
 [Visual ML Diagnostics](visual-diagnostics.md) for chart selection, sampling,
 returned fields, and interpretation limits.
 

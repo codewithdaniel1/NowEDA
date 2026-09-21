@@ -4,6 +4,27 @@ All notable changes to NowEDA are documented here.
 
 ---
 
+## [0.2.3] — Unreleased
+
+### Added
+
+- `vizall()` can fit bounded diagnostic baselines for linear regression,
+  logistic probability curves, linear and nonlinear SVM boundaries, and
+  PCA-projected K-Means previews.
+- Returned visual results include the fitted diagnostic type, selected
+  features, sample size, validation metric, and score under
+  `diagnostic_models`.
+
+### Changed
+
+- The deterministic playground dataset now contains clearer regression,
+  classification, nonlinear interaction, clustering, and leakage examples
+  while retaining 100,000 rows and 32 columns.
+- The `viz` and `test` dependency groups include scikit-learn for fitted visual
+  diagnostics.
+
+---
+
 ## [0.2.2] — 2026-09-21
 
 ### Added

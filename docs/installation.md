@@ -38,7 +38,7 @@ Some formats and analysis features require additional libraries:
 
 ```bash
 pip install "noweda[excel]"  # XLS, XLSB, ODS/ODF/ODT
-pip install "noweda[viz]"    # Matplotlib charts and SciPy KDE overlays
+pip install "noweda[viz]"    # Charts plus fitted regression, SVM, and clustering diagnostics
 pip install "noweda[ml]"     # Statsmodels and scikit-learn diagnostics
 ```
 

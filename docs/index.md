@@ -62,7 +62,8 @@ df.noweda.mlall(target="fraud_flag", problem_type="classification")
 
 `vizall(target=...)` visualizes class balance or target distribution, ranks
 feature-target relationships, and reports cautious linear or nonlinear signals.
-It does not train models or claim which estimator will win. See
+It may fit small visual baselines, but does not return a production model or
+claim which estimator will win. See
 [Visual ML Diagnostics](visual-diagnostics.md).
 
 ---

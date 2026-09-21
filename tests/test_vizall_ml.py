@@ -1,6 +1,9 @@
+import warnings
+
 import numpy as np
 import pandas as pd
 import pytest
+import noweda  # noqa: F401  # Register the pandas accessors for isolated runs.
 
 
 pytest.importorskip("matplotlib")
@@ -46,6 +49,77 @@ def test_vizall_returns_ranked_classification_diagnostics():
     assert len(result["figures"]) <= result["plots_generated"]
 
 
+def test_vizall_fits_logistic_and_svm_visual_baselines():
+    pytest.importorskip("sklearn")
+    frame = _classification_frame(rows=360)
+
+    result = frame.eda.vizall(target="fraud_flag", max_plots=10)
+
+    models = {item["model"] for item in result["diagnostic_models"]}
+    assert {"logistic_regression", "linear_svm", "rbf_svm"} <= models
+    assert "Logistic probability curve" in result["plot_titles"]
+    assert "Linear and nonlinear SVM boundaries" in result["plot_titles"]
+    assert all("validation_score" in item for item in result["diagnostic_models"])
+
+
+def test_vizall_prefers_nonlinear_feature_for_svm_boundary():
+    pytest.importorskip("sklearn")
+    rng = np.random.RandomState(17)
+    rows = 2_000
+    linear = rng.normal(size=rows)
+    curved = rng.normal(size=rows)
+    target = ((linear ** 2 + curved ** 2) > 2.0).astype(int)
+    frame = pd.DataFrame({
+        "linear_feature": linear,
+        "curved_feature": curved,
+        "target": target,
+    })
+
+    result = frame.eda.vizall(target="target", max_plots=10)
+
+    assert "nonlinear" in result["feature_shapes"].values()
+    svm_models = [
+        item for item in result["diagnostic_models"]
+        if item["model"] in {"linear_svm", "rbf_svm"}
+    ]
+    assert svm_models
+    assert all(
+        any(result["feature_shapes"].get(feature) == "nonlinear" for feature in item["features"])
+        for item in svm_models
+    )
+
+
+def test_vizall_fitted_diagnostics_ignore_nonfinite_rows():
+    pytest.importorskip("sklearn")
+    frame = _classification_frame(rows=400)
+    frame.loc[0, "linear_signal"] = np.inf
+    frame.loc[1, "curved_signal"] = -np.inf
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        result = frame.eda.vizall(target="fraud_flag", max_plots=10)
+
+    assert result["diagnostic_models"]
+    assert all(np.isfinite(item["validation_score"]) for item in result["diagnostic_models"])
+
+
+def test_vizall_regression_ignores_nonfinite_target_rows():
+    pytest.importorskip("sklearn")
+    rng = np.random.RandomState(23)
+    feature = np.linspace(-3, 3, 300)
+    target = 2.5 * feature + rng.normal(scale=2.0, size=len(feature))
+    target[[0, 1]] = [np.inf, -np.inf]
+    frame = pd.DataFrame({"feature": feature, "target": target})
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        result = frame.eda.vizall(target="target", max_plots=5)
+
+    assert result["target_summary"]["observed"] == 298
+    assert result["diagnostic_models"][0]["model"] == "linear_regression"
+    assert np.isfinite(result["diagnostic_models"][0]["validation_score"])
+
+
 def test_vizall_returns_regression_relationships_and_signals():
     rng = np.random.RandomState(11)
     feature = np.linspace(-3, 3, 240)
@@ -61,7 +135,33 @@ def test_vizall_returns_regression_relationships_and_signals():
     assert "Regression target distribution" in result["plot_titles"]
     assert result["associations"][0]["column"] == "feature"
     assert any("linear regression" in signal for signal in result["model_signals"])
+    assert result["diagnostic_models"][0]["model"] == "linear_regression"
+    assert "Linear regression fit and residuals" in result["plot_titles"]
     assert result["plots_generated"] <= 5
+
+
+def test_vizall_adds_exploratory_kmeans_projection_without_target():
+    pytest.importorskip("sklearn")
+    rng = np.random.RandomState(21)
+    rows = []
+    for center in [(-4, -4), (0, 4), (4, -2)]:
+        cloud = rng.normal(loc=center, scale=0.45, size=(100, 2))
+        rows.append(cloud)
+    points = np.vstack(rows)
+    frame = pd.DataFrame({
+        "feature_one": points[:, 0],
+        "feature_two": points[:, 1],
+        "feature_three": points[:, 0] + rng.normal(scale=0.2, size=len(points)),
+    })
+
+    result = frame.eda.vizall(max_plots=2)
+
+    assert result["plot_titles"] == ["PCA and K-Means cluster diagnostic"]
+    assert result["plots_generated"] == 2
+    diagnostic = result["diagnostic_models"][0]
+    assert diagnostic["model"] == "kmeans_pca_preview"
+    assert diagnostic["validation_metric"] == "silhouette"
+    assert 2 <= diagnostic["best_k"] <= 6
 
 
 def test_vizall_plot_budget_counts_panels_not_only_figures():
@@ -148,6 +248,29 @@ def test_vizall_flags_near_deterministic_features_as_possible_leakage():
     result = frame.eda.vizall(target="target", max_plots=3)
 
     assert any("Possible target leakage" in signal for signal in result["model_signals"])
+
+
+def test_vizall_excludes_leakage_from_fitted_diagnostics():
+    pytest.importorskip("sklearn")
+    rng = np.random.RandomState(4)
+    signal_one = rng.normal(size=300)
+    signal_two = rng.normal(size=300)
+    target = (signal_one + 0.4 * signal_two > 0).astype(int)
+    frame = pd.DataFrame({
+        "target_probability": target.astype(float),
+        "signal_one": signal_one,
+        "signal_two": signal_two,
+        "target": target,
+    })
+
+    result = frame.eda.vizall(target="target", max_plots=10)
+
+    assert "target_probability" in result["leakage_candidates"]
+    assert result["diagnostic_models"]
+    assert all(
+        "target_probability" not in item["features"]
+        for item in result["diagnostic_models"]
+    )
 
 
 def test_vizall_ignores_unused_target_categories_for_imbalance():
