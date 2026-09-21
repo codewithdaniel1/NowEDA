@@ -158,22 +158,29 @@ Returns `None`; output is printed directly (suitable for notebooks and terminals
 ### `df.noweda.vizall()`
 
 ```python
-df.noweda.vizall() → None
+df.noweda.vizall(sample=None, target=None, max_plots=15) → VizResult
 ```
 
-Auto-renders the best visualizations for your dataset based on column types:
+Ranks and renders a bounded set of visual diagnostics. With `target=None`, the
+selection covers general and unsupervised structure. A user-selected target
+adds classification or regression diagnostics.
 
-| Chart | Condition |
+| Parameter | Meaning |
 |---|---|
-| Histogram + KDE overlay | Every numeric column |
-| Bar chart (top 15) | Every categorical column with ≤ 30 unique values |
-| Correlation heatmap | When ≥ 2 numeric columns exist |
-| Missing value bar chart | When any column has missing values |
-| Time-series line plot | When datetime + numeric columns both exist |
+| `sample` | Optional deterministic row sample; small mode uses all rows by default |
+| `target` | Explicit prediction-target column; NowEDA never selects it silently |
+| `max_plots` | Positive panel budget, including subplots; default `15` |
 
-Install `noweda[viz]` for Matplotlib charts and SciPy KDE overlays.
+Possible output includes target balance or distribution, ranked feature-target
+relationships, selected distributions, missingness, correlations, outlier
+prevalence, feature-scale comparison, categorical associations, numeric
+relationships, and temporal structure.
 
-Returns `None`; charts are rendered inline (Jupyter) or displayed in a window (terminal).
+Returns a concise dictionary-like `VizResult` containing `figures`,
+`plot_titles`, `selected_features`, `associations`, `model_signals`, and `scope`.
+The figures render inline in Jupyter or open in a window from a terminal.
+See [Visual ML Diagnostics](visual-diagnostics.md) for the full returned schema,
+sampling behavior, and interpretation guidance.
 
 ---
 
@@ -209,9 +216,11 @@ df.noweda.mlall(
 
 When `plan=True`, the result includes `problem_type`, `problem_subtype`, `target`,
 `target_summary`, `features`, `inferred`, `inference_reason`, `recommendations`,
-`assessment`, `preprocessing`, `evaluation`, and `warnings`. Each recommendation
-contains `name`, `score`, `why`, and `caution`; `score` is a 1–5 estimated
-dataset-fit value rather than measured model performance.
+`assessment`, `preprocessing`, `evaluation`, and `warnings`. When a target is
+supplied, it also includes `visual_diagnostics`, using the same associations and
+model-family signals as `vizall(target=...)`. Each recommendation contains
+`name`, `score`, `why`, and `caution`; `score` is a 1–5 estimated dataset-fit
+value rather than measured model performance.
 
 See [Task-Aware ML Guidance](ml-guidance.md) for inference rules, validation, and
 complete examples.

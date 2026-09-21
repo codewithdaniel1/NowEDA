@@ -172,13 +172,21 @@ class LargeEDAAccessor:
         }
         return report
 
-    def vizall(self, sample=10_000):
-        """Render charts from the large-mode sample."""
+    def vizall(self, sample=10_000, target=None, max_plots=15):
+        """Render ranked charts from the large-mode sample."""
         self._announce_sample("vizall()", rows=sample)
         # Do not let the pandas accessor take a second, hidden sample of the
         # already bounded large-mode sample. An explicit ``sample=`` remains
         # available for callers who want smaller charts.
-        return self._pandas_accessor(sample).vizall(sample=sample)
+        result = self._pandas_accessor(sample).vizall(
+            sample=sample, target=target, max_plots=max_plots
+        )
+        result["scope"] = {
+            "rows": int(self._dataset.row_count),
+            "sample_rows": int(min(sample, self._dataset.row_count)),
+            "sample_based": self._dataset.row_count > sample,
+        }
+        return result
 
     def mlall(self, target=None, problem_type=None, features=None, plan=False, sample=10_000):
         """Create ML guidance from the sample and identify it as estimated."""

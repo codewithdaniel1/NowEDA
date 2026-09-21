@@ -97,6 +97,23 @@ candidates without leakage.
 
 ---
 
+**Q: Can `vizall()` tell me whether to use a linear or nonlinear model?**
+
+It provides evidence for choosing models to compare, not a final selection.
+Pass the target explicitly:
+
+```python
+visuals = df.noweda.vizall(target="fraud_flag", max_plots=15)
+print(visuals["model_signals"])
+```
+
+Approximately linear relationships can support a linear baseline. Curves,
+thresholds, or limited univariate separation can justify testing nonlinear
+models or interactions. Use leakage-safe validation to decide which candidate
+actually performs best. See [Visual ML Diagnostics](visual-diagnostics.md).
+
+---
+
 **Q: Does NowEDA support forecasting?**
 
 Not yet. Forecasting needs a time column, forecast horizon, optional series ID, and
@@ -124,9 +141,13 @@ Use explicit large mode for CSV, TSV, TXT, and Parquet files that should stay on
 ```python
 data = eda.read("large.csv", mode="large", chunksize=100_000)
 data.eda.statsall()
+visuals = data.eda.vizall(target="outcome", sample=25_000)
+print(visuals["scope"])
 ```
 
-Large mode prints a notice whenever a result is sample-based. Use
+Large mode uses `sample=10_000` by default for `statsall()`, `vizall()`, and
+`mlall()`. Pass another positive integer to change that scope. It prints a
+notice whenever a result is sample-based. Use
 `read_chunked(..., concat=False)` when you need manual streaming over CSV or
 line-delimited JSON batches.
 

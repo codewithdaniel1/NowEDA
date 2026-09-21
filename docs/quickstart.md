@@ -73,10 +73,17 @@ statistics, privacy signals, temporal findings, and practical preparation steps.
 
 ```python
 df.noweda.vizall()
+
+# Add supervised visual diagnostics when you know the prediction target.
+visuals = df.noweda.vizall(target="churned", max_plots=15)
 ```
 
-Install `noweda[viz]` for charts. Use `profile_column("column_name")` when a
-single field needs deeper inspection.
+Install `noweda[viz]` for charts. `vizall()` ranks useful fields, excludes
+likely identifiers and detected PII, and returns the figures and evidence used
+to select them. The charts suggest model families to validate; they do not
+measure model performance. Use `profile_column("column_name")` when a single
+field needs deeper inspection. The [visual diagnostics guide](visual-diagnostics.md)
+documents the returned evidence, plot budget, and large-mode sampling behavior.
 
 ### Advanced: extract insight strings
 
@@ -213,6 +220,7 @@ print(report["results"]["pii"])
 
 - [Reading Data](user-guide/reading-data.md) — all 28 supported formats
 - [The NowEDA Accessor](user-guide/accessor.md) — full `df.noweda.*` API
+- [Visual ML Diagnostics](visual-diagnostics.md) — ranked charts, targets, and sampling
 - [Task-Aware ML Guidance](ml-guidance.md) — targets, problem types, and validation
 - [Plugin Reference](plugins/overview.md) — what each plugin detects and how
 - [Scoring System](scoring.md) — how scores are calculated

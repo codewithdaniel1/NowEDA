@@ -63,6 +63,7 @@ nav:
   - Core Workflow:
     - Reading Data: user-guide/reading-data.md
     - The NowEDA Accessor: user-guide/accessor.md
+    - Visual ML Diagnostics: visual-diagnostics.md
     - Task-Aware ML Guidance: ml-guidance.md
     - Understanding Reports: user-guide/reports.md
   - Examples:

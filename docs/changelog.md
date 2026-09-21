@@ -4,6 +4,26 @@ All notable changes to NowEDA are documented here.
 
 ---
 
+## [0.2.2] — 2026-09-21
+
+### Added
+
+- `vizall(target=..., max_plots=15)` adds ranked classification and regression
+  diagnostics while keeping target selection explicit.
+- `vizall()` returns reusable figures, ranked associations, selected features,
+  sample scope, and cautious model-family signals in a concise result.
+- A Visual ML Diagnostics guide documents target-aware charts, returned
+  evidence, sampling behavior, and interpretation limits.
+
+### Changed
+
+- General visualization now uses an individual-panel budget instead of plotting
+  every eligible column, and excludes likely identifiers and detected PII.
+- `mlall(target=...)` reuses the same visual diagnostic evidence so its guidance
+  stays aligned with `vizall()`.
+
+---
+
 ## [0.2.1] — 2026-09-12
 
 ### Fixed
@@ -205,25 +225,3 @@ All notable changes to NowEDA are documented here.
 **Error handling**
 - Extension check before file existence check — unsupported formats get a clear error listing valid options
 - Missing optional dependency errors include the exact `pip install` command
-
----
-
-## Upcoming
-
-Features planned for future releases:
-
-- conda-forge package
-- Web dashboard UI
-
-### 2027 maintenance roadmap
-
-- Raise the supported Python baseline to 3.11 after Python 3.10 reaches end
-  of life, and test each maintained Python release in CI.
-- Maintain pandas 3 compatibility, especially string, categorical, datetime,
-  and missing-value inference used by NowEDA's schema rules.
-- Make large-mode samples more representative for ordered source files while
-  continuing to label estimated findings clearly.
-- Review DuckDB, PyArrow, and PySpark dependency support; keep local large-mode
-  installation straightforward and leave distributed execution opt-in.
-- Automate dependency updates and build checks, including wheel and source
-  distribution validation before releases.

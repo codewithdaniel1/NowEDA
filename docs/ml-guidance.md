@@ -12,6 +12,19 @@ print(plan["recommendations"])
 Stars and `/5` values are estimated dataset-fit scores within an analytical task.
 They are not cross-validation results or predictions of which model will win.
 
+Use `vizall(target=...)` to inspect the visual evidence behind model-family
+signals before fitting candidates:
+
+```python
+visuals = df.noweda.vizall(target="fraud_flag", max_plots=15)
+print(visuals["model_signals"])
+```
+
+When a target is supplied, `mlall()` reuses the same diagnostic evidence so its
+written guidance stays aligned with the charts. See
+[Visual ML Diagnostics](visual-diagnostics.md) for chart selection, sampling,
+returned fields, and interpretation limits.
+
 ## Start with the dataset
 
 Call `mlall()` without arguments when you have a dataset but do not yet know the
@@ -128,6 +141,7 @@ With `plan=True`, `mlall()` returns these fields after printing the guidance:
 | `assessment` | No-argument readiness, possible targets, excluded IDs, and analytical directions |
 | `preprocessing` / `evaluation` | Preparation, validation design, and suitable metrics |
 | `warnings` | Conditions requiring review before modeling |
+| `visual_diagnostics` | Target-aware associations and model-family signals shared with `vizall(target=...)` |
 
 Use a leakage-safe train/validation design, fit preprocessing only on training data,
 and compare metrics that match the actual decision objective.

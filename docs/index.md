@@ -50,12 +50,20 @@ print(df.describe())
 # Start with one complete assessment.
 df.noweda.statsall()
 
-# Add charts when a visual answer will help.
-# df.noweda.vizall()
+# Rank general charts within a bounded panel budget.
+df.noweda.vizall(max_plots=10)
+
+# Add target-aware diagnostics for model-family decisions.
+df.noweda.vizall(target="fraud_flag", max_plots=15)
 
 # State the target or unsupervised objective before requesting ML guidance
 df.noweda.mlall(target="fraud_flag", problem_type="classification")
 ```
+
+`vizall(target=...)` visualizes class balance or target distribution, ranks
+feature-target relationships, and reports cautious linear or nonlinear signals.
+It does not train models or claim which estimator will win. See
+[Visual ML Diagnostics](visual-diagnostics.md).
 
 ---
 

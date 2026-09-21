@@ -21,13 +21,20 @@ same core `.eda` workflow:
 ```python
 data = eda.read("data.csv", mode="large", chunksize=100_000)
 data.eda.statsall()
-data.eda.vizall()
+visuals = data.eda.vizall(
+    target="fraud_flag",
+    sample=25_000,
+    max_plots=15,
+)
 data.eda.mlall(target="fraud_flag")
 ```
 
 Large mode calculates dataset dimensions exactly. `statsall()`, `report()`,
 `vizall()`, `mlall()`, `profile_column()`, and `compare()` otherwise use a
 bounded sample and announce its size before displaying estimated findings.
+`statsall()`, `vizall()`, and `mlall()` default to `sample=10_000` in large
+mode; pass another positive integer to adjust the analysis scope. Review the
+returned `vizall()` scope to confirm how many source and sample rows were used.
 
 `eda.read_chunked()` always uses pandas. Use `concat=False` to iterate within bounded memory; the default `concat=True` retains all chunks and allocates a combined DataFrame.
 

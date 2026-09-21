@@ -43,8 +43,11 @@ df = pd.DataFrame({
 # Start with one complete assessment.
 df.eda.statsall()
 
-# Add charts when they help answer the next question.
-# df.eda.vizall()
+# With noweda[viz], rank general charts within a panel budget.
+# df.eda.vizall(max_plots=10)
+
+# Add target-aware diagnostics for model-family decisions.
+# df.eda.vizall(target="segment", max_plots=15)
 
 # Name an outcome before asking for supervised ML guidance.
 # df.eda.mlall(target="segment")
@@ -129,19 +132,32 @@ metrics, and cautions. Stars and `/5` values are estimated dataset-fit ratings
 within the selected task, not measured accuracy or expected performance. NowEDA
 does not train models in this step. See the [ML guidance documentation](https://codewithdaniel1.github.io/NowEDA/ml-guidance/).
 
-### 3. `df.eda.vizall()` — Automatic charts
+### 3. `df.eda.vizall()` — Ranked visual diagnostics
 
-Install `noweda[viz]` to draw distributions, correlations, categorical associations,
-missingness, and applicable temporal plots. Unsupported or undefined categorical
-associations appear as `N/A`, not zero association.
+Install `noweda[viz]` to draw a bounded set of distributions, relationships,
+missingness, outliers, feature scales, and applicable temporal plots. Supply the
+prediction target to add classification or regression diagnostics. NowEDA ranks
+useful features, excludes likely identifiers and detected PII, and describes
+model-family signals without claiming that a chart proves the best model.
 
 ```python
-df.eda.vizall()               # Small mode: use every loaded row
-df.eda.vizall(sample=5_000)   # Use a bounded sample
+df.eda.vizall()  # General and unsupervised structure
+
+visuals = df.eda.vizall(
+    target="fraud_flag",
+    max_plots=15,
+)
+print(visuals["model_signals"])
+
+df.eda.vizall(sample=5_000)  # Optional bounded sample
 ```
 
-Statistical reports use the complete DataFrame; visualization sampling affects
-only charts.
+`max_plots` counts individual chart panels, including subplots. The returned
+result contains the figures, ranked associations, selected features, plot
+titles, scope, and cautious model signals. In small mode, `sample=` bounds this
+visual analysis without changing the loaded DataFrame.
+See the [visual diagnostics guide](https://codewithdaniel1.github.io/NowEDA/visual-diagnostics/)
+for classification, regression, sampling, and interpretation details.
 
 ### 4. `df.eda.profile_column("age")` — One-column profile
 

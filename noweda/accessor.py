@@ -726,467 +726,42 @@ class NowEDAAccessor:
 
         print(f"\n{_CYAN}{'='*70}{_RESET}\n")
 
-    def vizall(self, sample=None):
-        """Auto-render the best visualizations for each column type.
+    def vizall(self, sample=None, target=None, max_plots=15):
+        """Render ranked, ML-aware visual diagnostics.
+
+        ``vizall()`` selects a bounded set of general diagnostics. Supplying a
+        target adds supervised feature-versus-target charts while preserving
+        the existing workflow. The returned dictionary-like result contains
+        the figures, ranked evidence, selected features, and scope metadata.
 
         Parameters
         ----------
         sample : int or None, default None
-            Number of rows to sample for visualization. Useful for large datasets (>50k rows).
-            By default charts use every input row. Use a higher or lower
-            positive integer when sampling is needed; chart data is then
-            explicitly identified as sample-based.
-
-            Sampling applies to both chart data and supporting analysis.
-
-        Produces
-        --------
-          - Histogram + KDE for every numeric column
-          - Bar chart of top categories for every categorical column
-          - Correlation heatmap when ≥2 numeric columns exist
-          - Missing-value bar chart when any missingness detected
-          - Time-series line plot for datetime columns (if a numeric col exists)
+            Analyze every loaded row by default, or use a deterministic sample.
+        target : column label or None, default None
+            User-selected prediction target. NowEDA infers classification or
+            regression from its observed values but never selects a target.
+        max_plots : int, default 15
+            Maximum number of individual chart panels to render.
         """
-        try:
-            import matplotlib.pyplot as plt
-            import matplotlib
-        except ImportError:
-            raise ImportError(
-                "matplotlib is required for vizall(). "
-                "Install it with: pip install matplotlib"
-            )
+        from noweda.visualization import render_vizall
 
         analysis_df = _analysis_sample(self._df, sample, "vizall()")
         if analysis_df is not self._df:
-            return analysis_df.eda.vizall(sample=sample)
+            result = analysis_df.eda.vizall(
+                sample=sample, target=target, max_plots=max_plots
+            )
+            result["scope"] = {
+                "rows": int(len(self._df)),
+                "sample_rows": int(len(analysis_df)),
+                "sample_based": True,
+            }
+            return result
 
         self._ensure_analyzed()
-        df_full = self._df
-
-        if sample is None:
-            df = df_full
-        elif isinstance(sample, bool) or not isinstance(sample, int) or sample <= 0:
-            raise ValueError("sample must be a positive integer")
-        elif len(df_full) > sample:
-            print(
-                f"NowEDA · vizall(): sample-based charts use {sample:,} of "
-                f"{len(df_full):,} rows. Estimates may differ from the full dataset."
-            )
-            df = df_full.sample(n=sample, random_state=42)
-        else:
-            df = df_full
-        results = self._report["results"]
-        schema = results.get("schema", {})
-        missing_info = results.get("missing", {})
-
-        # Helper: exclude ID and quasi-ID columns (not useful for visualization)
-        def is_id_column(col_name, col_values):
-            """Detect ID columns by name. Only exclude if column name suggests it's an identifier."""
-            # Check column name for ID indicators
-            col_lower = str(col_name).lower()
-            is_id_like = (
-                col_lower in ("id", "customer_id", "user_id", "record_id", "index", "idx") or
-                col_lower.endswith("_id") or
-                col_lower.startswith("id_")
-            )
-
-            # For object/string columns, also check if it's sequential IDs (like "CUST001", "USER_123")
-            if is_id_like:
-                return True
-
-            # High cardinality check: only for object columns (credit card, email, etc)
-            # Don't apply to numeric columns as continuous data naturally has high cardinality
-            if is_textual(col_values):
-                unique_ratio = col_values.nunique() / len(col_values) if len(col_values) > 0 else 0
-                if unique_ratio > 0.95:  # >95% unique string values likely PII/ID
-                    return True
-
-            return False
-
-        # Exclude ID columns from visualization
-        viz_cols = [c for c in df.columns if not is_id_column(c, df[c])]
-
-        # Helper: detect if a numeric column is actually PII (credit cards, etc.)
-        def is_numeric_pii(col_name, col_values):
-            """Detect numeric PII: credit_card, account_number, etc."""
-            col_lower = str(col_name).lower()
-            pii_indicators = (
-                "credit" in col_lower or
-                "card" in col_lower or
-                "account_number" in col_lower or
-                "ssn" in col_lower or
-                "zip" in col_lower
-            )
-            return pii_indicators
-
-        numeric_cols = [
-            c for c in viz_cols
-            if df[c].dtype.kind in ("i", "u", "f")
-            and not is_numeric_pii(c, df[c])  # Exclude numeric PII
-        ]
-        cat_cols = [
-            c for c in viz_cols
-            if is_textual(df[c])
-            and schema.get(c, {}).get("role") in ("categorical", "categorical_numeric", "text", None)
-            and df[c].nunique() <= 30
-        ]
-        datetime_cols = [
-            c for c in viz_cols
-            if df[c].dtype.kind == "M" or schema.get(c, {}).get("role") == "datetime"
-        ]
-        cols_with_missing = [
-            c for c in viz_cols
-            if df[c].isna().sum() > 0
-        ]
-
-        style = "dark_background" if "dark_background" in plt.style.available else "default"
-        plt.style.use(style)
-
-        figs_shown = 0
-
-        # ── Numeric: histogram + KDE ─────────────────────────────────────────
-        if numeric_cols:
-            n = len(numeric_cols)
-            ncols_grid = min(3, n)
-            nrows_grid = -(-n // ncols_grid)  # ceiling division
-            fig, axes = plt.subplots(
-                nrows_grid, ncols_grid,
-                figsize=(6 * ncols_grid, 4 * nrows_grid),
-                squeeze=False
-            )
-            fig.suptitle("Numeric Distributions", fontsize=14, fontweight="bold")
-            for i, col in enumerate(numeric_cols):
-                ax = axes[i // ncols_grid][i % ncols_grid]
-                data = df[col].dropna()
-                ax.hist(data, bins=30, color="#4C72B0", alpha=0.7, edgecolor="white", linewidth=0.4)
-                try:
-                    from scipy.stats import gaussian_kde
-                    import numpy as np
-                    if len(data) >= 2:
-                        kde = gaussian_kde(data)
-                        x = np.linspace(data.min(), data.max(), 200)
-                        ax2 = ax.twinx()
-                        ax2.plot(x, kde(x), color="#DD8452", linewidth=2)
-                        ax2.set_yticks([])
-                except ImportError:
-                    pass
-                ax.set_title(col, fontsize=11)
-                ax.set_xlabel(col)
-                ax.set_ylabel("Count")
-            # Hide empty subplots
-            for j in range(n, nrows_grid * ncols_grid):
-                axes[j // ncols_grid][j % ncols_grid].set_visible(False)
-            plt.tight_layout()
-            plt.show()
-            figs_shown += 1
-
-        # ── Categorical: bar charts with distribution ─────────────────────────
-        if cat_cols:
-            n = len(cat_cols)
-            ncols_grid = min(3, n)
-            nrows_grid = -(-n // ncols_grid)
-            fig, axes = plt.subplots(
-                nrows_grid, ncols_grid,
-                figsize=(6 * ncols_grid, 4 * nrows_grid),
-                squeeze=False
-            )
-            fig.suptitle("Categorical Distributions (top 15 values)", fontsize=14, fontweight="bold")
-            palette = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B2",
-                       "#937860", "#DA8BC3", "#8C8C8C", "#CCB974", "#64B5CD"]
-            for i, col in enumerate(cat_cols):
-                ax = axes[i // ncols_grid][i % ncols_grid]
-                counts = df[col].value_counts().head(15)
-                total = counts.sum()
-                colors = [palette[j % len(palette)] for j in range(len(counts))]
-                bars = ax.bar(range(len(counts)), counts.values, color=colors, edgecolor="white", linewidth=0.4)
-
-                # Add percentage labels on bars
-                for bar in bars:
-                    height = bar.get_height()
-                    pct = (height / total * 100) if total > 0 else 0
-                    ax.text(bar.get_x() + bar.get_width()/2., height,
-                            f'{pct:.0f}%', ha='center', va='bottom', fontsize=7, color='white', fontweight='bold')
-
-                ax.set_xticks(range(len(counts)))
-                ax.set_xticklabels(
-                    [str(x)[:10] for x in counts.index],
-                    rotation=45, ha="right", fontsize=8
-                )
-                ax.set_title(col, fontsize=11)
-                ax.set_ylabel("Count")
-                ax.set_ylim(0, max(counts.values) * 1.15)  # Space for labels
-            for j in range(n, nrows_grid * ncols_grid):
-                axes[j // ncols_grid][j % ncols_grid].set_visible(False)
-            plt.tight_layout()
-            plt.show()
-            figs_shown += 1
-
-        # ── Correlation heatmap ───────────────────────────────────────────────
-        if len(numeric_cols) >= 2:
-            try:
-                import numpy as np
-                corr = df[numeric_cols].corr()
-                n = len(numeric_cols)
-                fig_size = max(6, min(n * 1.2, 16))
-                fig, ax = plt.subplots(figsize=(fig_size, fig_size * 0.85))
-                cmap = matplotlib.colormaps.get_cmap("coolwarm") if hasattr(matplotlib, "colormaps") else plt.cm.coolwarm
-                im = ax.imshow(corr.values, cmap=cmap, vmin=-1, vmax=1, aspect="auto")
-                plt.colorbar(im, ax=ax, shrink=0.8)
-                ax.set_xticks(range(n))
-                ax.set_yticks(range(n))
-                ax.set_xticklabels(numeric_cols, rotation=45, ha="right", fontsize=9)
-                ax.set_yticklabels(numeric_cols, fontsize=9)
-                # Annotate cells
-                for row in range(n):
-                    for col_i in range(n):
-                        val = corr.values[row, col_i]
-                        ax.text(col_i, row, f"{val:.2f}", ha="center", va="center",
-                                fontsize=8, color="white" if abs(val) > 0.5 else "black")
-                ax.set_title("Correlation Heatmap", fontsize=14, fontweight="bold")
-                plt.tight_layout()
-                plt.show()
-                figs_shown += 1
-            except Exception:
-                pass
-
-        # ── Missing value chart ───────────────────────────────────────────────
-        if cols_with_missing:
-            miss_rates = {
-                c: round(df[c].isna().sum() / len(df) * 100, 2)
-                for c in cols_with_missing
-            }
-            miss_rates = dict(sorted(miss_rates.items(), key=lambda x: -x[1]))
-            fig, ax = plt.subplots(figsize=(max(6, len(miss_rates) * 0.8), 5))
-            colors = ["#C44E52" if v >= 50 else "#DD8452" if v >= 20 else "#4C72B0"
-                      for v in miss_rates.values()]
-            bars = ax.bar(range(len(miss_rates)), list(miss_rates.values()),
-                          color=colors, edgecolor="white", linewidth=0.4)
-            ax.set_xticks(range(len(miss_rates)))
-            ax.set_xticklabels(list(miss_rates.keys()), rotation=45, ha="right", fontsize=9)
-            ax.set_ylabel("Missing %")
-            ax.set_title("Missing Values by Column", fontsize=13, fontweight="bold")
-            ax.set_ylim(0, 100)
-            for bar, val in zip(bars, miss_rates.values()):
-                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
-                        f"{val:.1f}%", ha="center", va="bottom", fontsize=8)
-            plt.tight_layout()
-            plt.show()
-            figs_shown += 1
-
-        # ── Missing data correlation heatmap ──────────────────────────────────
-        if len(cols_with_missing) >= 2:
-            try:
-                import numpy as np
-                # Create binary matrix: 1 if missing, 0 if not
-                missing_matrix = df[cols_with_missing].isna().astype(int)
-                # Compute correlation between missing patterns
-                missing_corr = missing_matrix.corr()
-
-                if len(cols_with_missing) > 1:
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    cmap = matplotlib.colormaps.get_cmap("RdYlGn_r") if hasattr(matplotlib, "colormaps") else plt.cm.RdYlGn_r
-                    im = ax.imshow(missing_corr.values, cmap=cmap, aspect='auto', vmin=-1, vmax=1)
-                    plt.colorbar(im, ax=ax, label="Correlation in Missing Patterns")
-
-                    ax.set_xticks(range(len(cols_with_missing)))
-                    ax.set_yticks(range(len(cols_with_missing)))
-                    ax.set_xticklabels(cols_with_missing, rotation=45, ha='right', fontsize=9)
-                    ax.set_yticklabels(cols_with_missing, fontsize=9)
-
-                    # Annotate
-                    for i in range(len(cols_with_missing)):
-                        for j in range(len(cols_with_missing)):
-                            text = ax.text(j, i, f'{missing_corr.values[i, j]:.2f}',
-                                          ha="center", va="center",
-                                          color="black" if abs(missing_corr.values[i, j]) < 0.5 else "white",
-                                          fontsize=8)
-
-                    ax.set_title("Missing Data Patterns (Correlation)", fontsize=13, fontweight="bold")
-                    plt.tight_layout()
-                    plt.show()
-                    figs_shown += 1
-            except Exception:
-                pass
-
-        # ── Datetime line plots ───────────────────────────────────────────────
-        if datetime_cols and numeric_cols:
-            dt_col = datetime_cols[0]
-            num_col = numeric_cols[0]
-            try:
-                sorted_df = df[[dt_col, num_col]].dropna().sort_values(dt_col)
-                fig, ax = plt.subplots(figsize=(12, 4))
-                ax.plot(sorted_df[dt_col], sorted_df[num_col],
-                        color="#4C72B0", linewidth=1.2)
-                ax.set_title(f"{num_col} over {dt_col}", fontsize=13, fontweight="bold")
-                ax.set_xlabel(dt_col)
-                ax.set_ylabel(num_col)
-                plt.xticks(rotation=30, ha="right")
-                plt.tight_layout()
-                plt.show()
-                figs_shown += 1
-            except Exception:
-                pass
-
-        # ── Box plots: numeric vs categorical ──────────────────────────────────
-        if numeric_cols and cat_cols:
-            try:
-                # Select top categorical column (by cardinality, not too many levels)
-                cat_by_card = sorted(cat_cols, key=lambda c: df[c].nunique())
-                cat_col = cat_by_card[0] if df[cat_by_card[0]].nunique() <= 20 else None
-
-                if cat_col:
-                    n = len(numeric_cols)
-                    ncols_grid = min(3, n)
-                    nrows_grid = -(-n // ncols_grid)
-                    fig, axes = plt.subplots(
-                        nrows_grid, ncols_grid,
-                        figsize=(6 * ncols_grid, 4 * nrows_grid),
-                        squeeze=False
-                    )
-                    fig.suptitle(f"Numeric Distributions by {cat_col}", fontsize=14, fontweight="bold")
-                    palette_box = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B2", "#937860"]
-                    for i, col in enumerate(numeric_cols):
-                        ax = axes[i // ncols_grid][i % ncols_grid]
-                        df_plot = df[[col, cat_col]].dropna()
-                        if len(df_plot) > 0:
-                            df_plot.boxplot(column=col, by=cat_col, ax=ax)
-                            ax.set_title(col, fontsize=11)
-                            ax.set_xlabel(cat_col)
-                            plt.sca(ax)
-                            plt.xticks(rotation=45, ha="right", fontsize=8)
-                    for j in range(n, nrows_grid * ncols_grid):
-                        axes[j // ncols_grid][j % ncols_grid].set_visible(False)
-                    plt.tight_layout()
-                    plt.show()
-                    figs_shown += 1
-            except Exception:
-                pass
-
-        # ── Feature variance/importance ranking ────────────────────────────────
-        if numeric_cols:
-            try:
-                import numpy as np
-                variances = []
-                for col in numeric_cols:
-                    var = df[col].var()
-                    if not np.isnan(var):
-                        variances.append((col, var))
-
-                if variances:
-                    variances.sort(key=lambda x: -x[1])
-                    fig, ax = plt.subplots(figsize=(10, 5))
-                    cols, vars = zip(*variances[:15])
-                    # Normalize variances to 0-100 scale for readability
-                    max_var = max(vars)
-                    normalized = [v / max_var * 100 for v in vars]
-                    colors_var = ["#4C72B0" if v > 50 else "#DD8452" if v > 20 else "#8C8C8C" for v in normalized]
-                    bars = ax.barh(cols, normalized, color=colors_var, edgecolor="white", linewidth=0.5)
-                    ax.set_xlabel("Variance (normalized to 0-100)")
-                    ax.set_title("Feature Variance Ranking (Higher = More Information)", fontsize=13, fontweight="bold")
-                    ax.invert_yaxis()
-                    for i, (bar, v) in enumerate(zip(bars, vars)):
-                        ax.text(100 + 2, i, f"{v:.2e}", va='center', fontsize=8)
-                    plt.tight_layout()
-                    plt.show()
-                    figs_shown += 1
-            except Exception:
-                pass
-
-        # ── Pair plot: top correlated pairs ────────────────────────────────────
-        if numeric_cols and len(numeric_cols) >= 2:
-            try:
-                corr_matrix = df[numeric_cols].corr().abs()
-                # Find top correlations (excluding diagonal)
-                top_pairs = []
-                for i in range(len(numeric_cols)):
-                    for j in range(i + 1, len(numeric_cols)):
-                        corr_val = corr_matrix.iloc[i, j]
-                        if corr_val > 0.3:  # threshold
-                            top_pairs.append((numeric_cols[i], numeric_cols[j], corr_val))
-
-                top_pairs.sort(key=lambda x: -x[2])
-                n_pairs = min(6, len(top_pairs))  # Show up to 6 pairs in 2x3 grid
-
-                if n_pairs > 0:
-                    ncols_grid = min(3, n_pairs)
-                    nrows_grid = -(-n_pairs // ncols_grid)
-                    fig, axes = plt.subplots(
-                        nrows_grid, ncols_grid,
-                        figsize=(5 * ncols_grid, 4 * nrows_grid),
-                        squeeze=False
-                    )
-                    fig.suptitle("Top Correlated Feature Pairs", fontsize=14, fontweight="bold")
-
-                    for idx, (col1, col2, corr_val) in enumerate(top_pairs[:n_pairs]):
-                        ax = axes[idx // ncols_grid][idx % ncols_grid]
-                        df_plot = df[[col1, col2]].dropna()
-                        ax.scatter(df_plot[col1], df_plot[col2], alpha=0.6, color="#4C72B0", edgecolor="white", linewidth=0.4)
-
-                        # Add regression line
-                        z = np.polyfit(df_plot[col1], df_plot[col2], 1)
-                        p = np.poly1d(z)
-                        x_line = np.linspace(df_plot[col1].min(), df_plot[col1].max(), 100)
-                        ax.plot(x_line, p(x_line), color="#DD8452", linewidth=2, label=f"r={corr_val:.2f}")
-
-                        ax.set_xlabel(col1, fontsize=9)
-                        ax.set_ylabel(col2, fontsize=9)
-                        ax.set_title(f"{col1} vs {col2}", fontsize=10)
-                        ax.legend(fontsize=8)
-                        ax.grid(alpha=0.3)
-
-                    for j in range(n_pairs, nrows_grid * ncols_grid):
-                        axes[j // ncols_grid][j % ncols_grid].set_visible(False)
-                    plt.tight_layout()
-                    plt.show()
-                    figs_shown += 1
-            except Exception:
-                pass
-
-        # ── Categorical relationship heatmap (Cramér's V) ───────────────────────
-        if len(cat_cols) >= 2:
-            try:
-                from noweda.ml_utils import cramers_v
-                import numpy as np
-
-                # Compute Cramér's V for all cat column pairs
-                cramers_matrix = np.full((len(cat_cols), len(cat_cols)), np.nan)
-                for i, col1 in enumerate(cat_cols):
-                    for j, col2 in enumerate(cat_cols):
-                        if i == j:
-                            cramers_matrix[i, j] = 1.0
-                        elif i < j:
-                            try:
-                                v = cramers_v(df[col1], df[col2])
-                                cramers_matrix[i, j] = cramers_matrix[j, i] = v
-                            except Exception:
-                                pass
-
-                fig, ax = plt.subplots(figsize=(8, 6))
-                cmap = matplotlib.colormaps.get_cmap("YlOrRd") if hasattr(matplotlib, "colormaps") else plt.cm.YlOrRd
-                im = ax.imshow(np.ma.masked_invalid(cramers_matrix), cmap=cmap, aspect='auto', vmin=0, vmax=1)
-                plt.colorbar(im, ax=ax, label="Cramér's V")
-
-                ax.set_xticks(range(len(cat_cols)))
-                ax.set_yticks(range(len(cat_cols)))
-                ax.set_xticklabels(cat_cols, rotation=45, ha='right', fontsize=9)
-                ax.set_yticklabels(cat_cols, fontsize=9)
-
-                # Annotate
-                for i in range(len(cat_cols)):
-                    for j in range(len(cat_cols)):
-                        text = ax.text(j, i, ('N/A' if np.isnan(cramers_matrix[i, j]) else f'{cramers_matrix[i, j]:.2f}'),
-                                      ha="center", va="center", color="black" if np.isnan(cramers_matrix[i, j]) or cramers_matrix[i, j] < 0.5 else "white",
-                                      fontsize=8)
-
-                ax.set_title("Categorical Association (Cramér's V)", fontsize=13, fontweight="bold")
-                plt.tight_layout()
-                plt.show()
-                figs_shown += 1
-            except Exception:
-                pass
-
-        if figs_shown == 0:
-            print("No visualizations could be generated for this dataset.")
+        return render_vizall(
+            self._df, self._report, target=target, max_plots=max_plots
+        )
 
     def mlall(self, target=None, problem_type=None, features=None, plan=False, sample=None):
         """Print task-aware ML guidance and optionally return its structured result.
@@ -1208,7 +783,24 @@ class NowEDAAccessor:
             self._df, self._report, target=target,
             problem_type=problem_type, features=features,
         )
+        if target is not None:
+            from noweda.visualization import build_visual_diagnostics
+
+            target_values = self._df.iloc[:, self._df.columns.get_loc(target)]
+            if target_values.notna().any():
+                visual = build_visual_diagnostics(
+                    self._df, self._report, target=target
+                )
+                result["visual_diagnostics"] = {
+                    key: value for key, value in visual.items()
+                    if key not in {"numeric_scales"}
+                }
         format_ml_plan(result)
+        visual = result.get("visual_diagnostics")
+        if visual and visual.get("model_signals"):
+            print("\n  Visual diagnostics to validate with vizall(target={!r}):".format(target))
+            for signal in visual["model_signals"]:
+                print("    - {}".format(signal))
         if plan:
             return result
 

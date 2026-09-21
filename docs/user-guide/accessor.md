@@ -264,26 +264,42 @@ Output sections:
 
 ### `df.noweda.vizall()`
 
-Auto-renders the best visualizations for your dataset without any configuration.
+Ranks and renders the most useful visual diagnostics within a panel budget.
 
 ```python
 df.noweda.vizall()
+
+visuals = df.noweda.vizall(
+    target="fraud_flag",
+    max_plots=15,
+)
 ```
 
-| Chart produced | Trigger |
+| Mode | Diagnostics |
 |---|---|
-| Histogram + KDE overlay (grid) | Every numeric column |
-| Bar chart top-15 values (grid) | Every categorical column with ≤ 30 unique values |
-| Correlation heatmap | When ≥ 2 numeric columns exist |
-| Missing value bar chart | When any column has missing values |
-| Time-series line plot | When datetime + numeric columns both exist |
+| No target | Selected distributions, missingness, correlations, scales, outliers, categorical associations, numeric relationships, and temporal structure |
+| Classification target | Class balance plus ranked numeric and categorical class-separation diagnostics |
+| Regression target | Target distribution plus ranked scatter, linear-trend, binned-mean, and categorical group diagnostics |
 
-Requires `matplotlib`. KDE overlay additionally uses `scipy` if installed.
+Likely identifiers and detected PII are excluded from feature diagnostics.
+`max_plots` counts individual chart panels, including subplots. The default is
+15. Use `sample=` to bound both the chart data and supporting analysis.
 
 ```python
-# Works in Jupyter notebooks (inline) or terminal (opens window)
-df.noweda.vizall()
+visuals["figures"]
+visuals["selected_features"]
+visuals["associations"]
+visuals["model_signals"]
+visuals["scope"]
 ```
+
+Model signals describe visible linear, nonlinear, overlap, imbalance, and
+scaling evidence. Final estimator choice still requires fitting and validation.
+Requires `matplotlib` through `noweda[viz]`.
+
+See [Visual ML Diagnostics](../visual-diagnostics.md) for the complete result
+schema, classification and regression behavior, sampling, and interpretation
+limits.
 
 ---
 
