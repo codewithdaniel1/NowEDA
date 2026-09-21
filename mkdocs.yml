@@ -90,6 +90,7 @@ nav:
       - Writing Custom Plugins: plugins/custom.md
     - Custom Plugin Example: examples/custom-plugin.md
     - API Reference: api-reference.md
+    - Future Design: future-design.md
   - FAQ: faq.md
   - Changelog: changelog.md
 
