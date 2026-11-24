@@ -8,7 +8,6 @@ Every method that uses that sample announces it before returning a result.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -16,6 +15,14 @@ import pandas as pd
 
 
 _LARGE_FORMATS = {".csv", ".tsv", ".tab", ".txt", ".parquet"}
+
+
+def _analysis_rows(sample):
+    if sample is None:
+        return 10_000
+    if isinstance(sample, bool) or not isinstance(sample, int) or sample <= 0:
+        raise ValueError("sample must be a positive integer")
+    return sample
 
 
 class LargeDataset:
@@ -31,13 +38,14 @@ class LargeDataset:
         self.path = str(Path(file_path))
         self.chunksize = chunksize
         self.read_kwargs = read_kwargs
-        self._sample_dfs = {}
+        self._cached_sample = None
         self._row_count: Optional[int] = None
         self._columns: Optional[list[str]] = None
         self._accessor: Optional[LargeEDAAccessor] = None
 
         self._duckdb = self._require_duckdb()
-        self._connection = self._duckdb.connect(":memory:")
+        # A seeded reservoir is repeatable when the file scan uses one thread.
+        self._connection = self._duckdb.connect(":memory:", config={"threads": 1})
         self._create_source_view()
 
     @staticmethod
@@ -106,13 +114,22 @@ class LargeDataset:
 
     def _sample(self, rows: Optional[int] = None) -> pd.DataFrame:
         rows = min(rows if rows is not None else self.chunksize, self.row_count)
-        if rows not in self._sample_dfs:
-            # A stable bounded sample keeps all exploratory operations safe for
-            # files with millions of rows.  The notice makes this explicit.
-            self._sample_dfs[rows] = self._connection.execute(
-                "SELECT * FROM noweda_source LIMIT ?", [rows]
-            ).fetchdf()
-        return self._sample_dfs[rows]
+        if self._cached_sample is None or len(self._cached_sample) != rows:
+            if rows == self.row_count:
+                self._cached_sample = self.head(rows)
+            else:
+                # Keep original order for temporal analysis. DuckDB needs a
+                # literal reservoir size; rows comes from validated integers.
+                ordinal = "_noweda_row"
+                names = {name.lower() for name in self.columns}
+                while ordinal in names:
+                    ordinal += "_"
+                self._cached_sample = self._connection.execute(
+                    f"SELECT * EXCLUDE ({ordinal}) FROM "
+                    f"(SELECT *, row_number() OVER () AS {ordinal} FROM noweda_source) "
+                    f"USING SAMPLE reservoir({rows} ROWS) REPEATABLE (42) ORDER BY {ordinal}"
+                ).fetchdf()
+        return self._cached_sample
 
     @property
     def eda(self) -> "LargeEDAAccessor":
@@ -151,6 +168,7 @@ class LargeEDAAccessor:
 
     def statsall(self, sample=10_000):
         """Print exploratory analysis from a bounded sample; row count is exact."""
+        sample = _analysis_rows(sample)
         self._announce_sample("statsall()", rows=sample)
         print(f"Exact dataset size: {self._dataset.row_count:,} rows × {len(self._dataset.columns)} columns")
         return self._pandas_accessor(sample).statsall(sample=sample)
@@ -174,6 +192,7 @@ class LargeEDAAccessor:
 
     def vizall(self, sample=10_000, target=None, max_plots=15):
         """Render ranked charts from the large-mode sample."""
+        sample = _analysis_rows(sample)
         self._announce_sample("vizall()", rows=sample)
         # Do not let the pandas accessor take a second, hidden sample of the
         # already bounded large-mode sample. An explicit ``sample=`` remains
@@ -190,6 +209,7 @@ class LargeEDAAccessor:
 
     def mlall(self, target=None, problem_type=None, features=None, plan=False, sample=10_000):
         """Create ML guidance from the sample and identify it as estimated."""
+        sample = _analysis_rows(sample)
         self._announce_sample("mlall()", rows=sample)
         return self._pandas_accessor(sample).mlall(
             target=target, problem_type=problem_type, features=features, plan=plan,

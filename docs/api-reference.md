@@ -175,7 +175,8 @@ Possible output includes target balance or distribution, ranked feature-target
 relationships, selected distributions, missingness, correlations, outlier
 prevalence, feature-scale comparison, categorical associations, numeric
 relationships, temporal structure, logistic curves, linear-regression residuals,
-two-feature SVM boundaries, and PCA-projected K-Means diagnostics.
+two-feature SVM boundaries alongside the observed classes, and PCA-projected
+K-Means diagnostics. Crosses on the SVM charts mark mistakes on held-out rows.
 
 Returns a concise dictionary-like `VizResult` containing `figures`,
 `plot_titles`, `selected_features`, `associations`, `model_signals`,

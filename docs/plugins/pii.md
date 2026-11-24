@@ -8,8 +8,15 @@
 
 Scans object, string and categorical columns for email addresses, US-style phone
 numbers, formatted US Social Security numbers and supported credit card patterns.
-Numeric and datetime columns are skipped; load identifiers as strings to preserve
-leading zeros and formatting.
+Numeric columns are checked when their names suggest a phone, card or SSN,
+such as `home_phone`, `payment_card` or `ssn`. A phone accepts ten digits or
+eleven starting with 1. Numeric SSNs require nine digits. Numeric cards use
+the same issuer and checksum checks as text cards. Read identifiers as text
+to preserve leading zeros and long numbers exactly.
+
+Default reports keep counts for flagged columns and hide values such as the
+most common email or the minimum phone number. Custom plugins control their
+own output.
 
 ## Output Format
 

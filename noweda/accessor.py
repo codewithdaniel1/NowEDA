@@ -360,6 +360,7 @@ class NowEDAAccessor:
         insights = report["insights"]
         stats = results.get("stats", {})
         schema = results.get("schema", {})
+        pii = results.get("pii", {})
 
         _BOLD  = "\033[1m"
         _CYAN  = "\033[36m"
@@ -401,7 +402,7 @@ class NowEDAAccessor:
         risk = scores.get("risk", "N/A")
         print(f"  Data Quality    : {score_color(dq)  if isinstance(dq, (int,float))  else dq} out of 100")
         print(f"  Model Readiness : {score_color(mr)  if isinstance(mr, (int,float))  else mr} out of 100")
-        print(f"  Risk            : {_RED if isinstance(risk,(int,float)) and risk>0 else _GREEN}{risk}{_RESET}  (0 = no risk)")
+        print(f"  Risk            : {_RED if isinstance(risk,(int,float)) and risk>0 else _GREEN}{risk}{_RESET}  (0 = no signals detected)")
 
         # ── Dtypes ───────────────────────────────────────────────────────────
         h2("Column Types")
@@ -426,7 +427,7 @@ class NowEDAAccessor:
         h2("Descriptive Statistics")
 
         # Numeric columns
-        num_cols = [c for c in df.columns if df[c].dtype.kind in ("i", "u", "f")]
+        num_cols = [c for c in df.columns if df[c].dtype.kind in ("i", "u", "f") and c not in pii]
         if num_cols:
             print(f"\n  {'Column':<{col_w}} {'Count':>8} {'Mean':>12} {'Std':>12} {'Min':>10} {'25%':>10} {'50%':>10} {'75%':>10} {'Max':>10} {'Skew':>8}")
             print(f"  {'-'*col_w} {'--------':>8} {'------------':>12} {'------------':>12} {'----------':>10} {'----------':>10} {'----------':>10} {'----------':>10} {'----------':>10} {'--------':>8}")
@@ -461,7 +462,7 @@ class NowEDAAccessor:
                 s = stats.get(col, {})
                 count = s.get("count", 0)
                 uniq  = s.get("unique", 0)
-                top   = str(s.get("top_value", "N/A"))[:26]
+                top   = str(s.get("top_value", "Hidden" if col in pii else "N/A"))[:26]
                 freq  = s.get("top_freq", 0)
 
                 # Calculate diversity: entropy-based (0=one dominant, 1=uniform)
@@ -583,7 +584,6 @@ class NowEDAAccessor:
         else:
             print("  Outliers        : none")
 
-        pii = results.get("pii", {})
         if pii:
             pii_columns = ", ".join(map(str, list(pii)[:4]))
             suffix = f" and {len(pii) - 4} more" if len(pii) > 4 else ""
@@ -603,7 +603,6 @@ class NowEDAAccessor:
         h2("ML Preprocessing Recommendations")
 
         # Multicollinearity
-        num_cols = [c for c in df.columns if df[c].dtype.kind in ("i", "u", "f")]
         preprocessing_cols = []
         vif_cols = []
         excluded_preprocessing_cols = []
@@ -673,7 +672,6 @@ class NowEDAAccessor:
         # Role-aware feature review. High uniqueness is normal for continuous
         # numeric values and means something different for IDs, PII, dates,
         # free text, and true categorical values.
-        pii = results.get("pii", {})
         feature_review = []
         for col in df.columns:
             role = schema.get(col, {}).get("role", "unknown")
@@ -693,6 +691,8 @@ class NowEDAAccessor:
         # Rare categories
         rare_issues = {}
         for col in df.columns:
+            if col in pii:
+                continue
             role = schema.get(col, {}).get("role", "unknown")
             rare = rare_category_detection(df[col], threshold=0.01, role=role)
             if rare:
@@ -791,8 +791,10 @@ class NowEDAAccessor:
             target_values = self._df.iloc[:, self._df.columns.get_loc(target)]
             if target_values.notna().any():
                 visual = build_visual_diagnostics(
-                    self._df, self._report, target=target
+                    self._df[result["features"] + [target]], self._report,
+                    target=target, problem_type=result["problem_type"],
                 )
+                visual["target_summary"]["inference_reason"] = result["inference_reason"] or "user-selected prediction task"
                 result["visual_diagnostics"] = {
                     key: value for key, value in visual.items()
                     if key not in {"numeric_scales"}
@@ -800,7 +802,7 @@ class NowEDAAccessor:
         format_ml_plan(result)
         visual = result.get("visual_diagnostics")
         if visual and visual.get("model_signals"):
-            print("\n  Visual diagnostics to validate with vizall(target={!r}):".format(target))
+            print("\n  What the selected features suggest:")
             for signal in visual["model_signals"]:
                 print("    - {}".format(signal))
         if plan:
@@ -847,6 +849,10 @@ class NowEDAAccessor:
         print(f"  Inferred Role   : {col_schema.get('role', 'unknown')} (confidence: {col_schema.get('confidence', 'N/A')})")
         print(f"  Unique Values   : {col.nunique()}")
         print(f"  Missing         : {col.isna().sum()} ({col.isna().sum() / len(col) * 100:.1f}%)")
+
+        if column_name in results.get("pii", {}):
+            print("  Values hidden because this column contains personal data signals.")
+            return
 
         # Numeric-specific analysis
         if col.dtype.kind in ('i', 'u', 'f'):

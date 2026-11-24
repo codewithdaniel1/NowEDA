@@ -107,9 +107,7 @@ because of the budget. Do not fill unused space with uninformative plots.
 - Keep fitting bounded and deterministic. Disclose source rows, analysis rows,
   and diagnostic fitting rows separately, along with transformations and any
   plot zoom or omitted observations.
-- Preserve small-mode and large-mode sampling behavior, while disclosing the
-  limitations of a leading-row sample until representative large-mode sampling
-  is implemented.
+- Keep sample sizes visible. Check how often small samples miss rare classes.
 - Treat repeated entities and time dependence as validation concerns; do not
   imply that an ordinary random split establishes forecasting performance.
 - Keep `mlall()` model-free and its estimated-fit stars separate from measured
@@ -139,10 +137,8 @@ honestly. No dataset should be required to display every model or graph type.
 ## Deferred large-mode work
 
 Large mode currently keeps the source on disk and uses a bounded, deterministic
-sample for exploratory work. The next reliability-focused release should:
+sample drawn from across the file for exploratory work. Remaining work includes
 
-- replace the current leading-row sample with a reproducible, representative
-  sample for ordered source files;
 - benchmark CSV and Parquet inputs at practical sizes and improve recovery from
   malformed input;
 - keep every estimated result clearly labelled with its sample size; and

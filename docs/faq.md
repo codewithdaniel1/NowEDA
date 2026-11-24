@@ -212,7 +212,7 @@ No. The Correlation plugin only runs on numeric columns. With no numeric data, t
 
 **Q: The PII plugin didn't flag my phone numbers. Why?**
 
-The built-in plugin checks ten-digit US-style phone numbers in text columns, with an optional `+1`. Other countries, short local numbers and numeric-typed columns may be missed. Card-shaped spans are excluded to avoid false phone matches. See [PII detection](plugins/pii.md) for supported formats.
+The built-in plugin checks ten-digit US-style phone numbers in text columns, with an optional `+1`. It also checks numeric columns with names such as `home_phone`. Other countries, short local numbers and numeric fields with unrelated names may be missed. Card-shaped spans are excluded to avoid false phone matches. See [PII detection](plugins/pii.md) for supported formats.
 
 ---
 

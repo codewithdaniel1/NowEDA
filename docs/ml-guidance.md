@@ -142,7 +142,7 @@ With `plan=True`, `mlall()` returns these fields after printing the guidance:
 | `assessment` | No-argument readiness, possible targets, excluded IDs, and analytical directions |
 | `preprocessing` / `evaluation` | Preparation, validation design, and suitable metrics |
 | `warnings` | Conditions requiring review before modeling |
-| `visual_diagnostics` | Target-aware associations and model-family signals shared with `vizall(target=...)` |
+| `visual_diagnostics` | Associations and chart interpretations for the target, features and prediction task in this plan |
 
 Use a leakage-safe train/validation design, fit preprocessing only on training data,
 and compare metrics that match the actual decision objective.

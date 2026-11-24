@@ -4,67 +4,27 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/noweda?label=PyPI)](https://pypi.org/project/noweda/)
 
-NowEDA profiles pandas DataFrames with heuristic quality scores, pattern-based PII detection, outlier analysis, correlations and readable insights. Use `df.noweda` or the equivalent `df.eda` accessor. For data that should stay on disk, explicit `eda.read(..., mode="large")` supports the same core `.eda` workflow and clearly marks sample-based findings.
+Use NowEDA to explore a table and choose a first model to try.
 
----
+## Your first prediction question
 
-## Why NowEDA?
-
-Most EDA tools give you charts and tables. NowEDA gives you **answers**.
-
-| Other EDA tools | NowEDA |
-|---|---|
-| "Here are histograms" | "Column 'salary' is heavily right-skewed — consider a log transform" |
-| Show missing value counts | "Column 'email' is 32% missing — imputation recommended" |
-| Show correlation matrix | "Very strong correlation (0.99) between 'age' and 'salary' — one may be redundant" |
-| No security awareness | "Column 'email' contains 17 PII email addresses — mask before sharing" |
-| Mix unrelated ML algorithms | Task-aware candidates for your selected target and problem type |
-| Requires specific file format | Supports 28 file extensions, with optional readers where needed |
-
----
-
-## Core Design Principles
-
-**1. Pandas-native** — `df.noweda.*` feels like part of pandas itself. No wrappers, no new object types to learn.
-
-**2. Zero fragile dependencies** — NowEDA does not wrap or depend on other EDA libraries (ydata-profiling, Sweetviz, D-Tale). Every analysis is implemented from scratch, so no upstream changes can break your workflow.
-
-**3. Plugin-based** — Every analysis step is an independent, swappable plugin. Run only what you need, or add your own.
-
-**4. Security-aware** — Built-in PII and encoding detection that no other EDA tool provides out of the box.
-
----
-
-## Quick Example
+Suppose you want to predict whether a customer will leave. The **target** is
+the column that records what happened, such as `churned`. The **features** are
+the details you would know beforehand, such as how often the customer logged in.
 
 ```python
 import noweda as eda
 
-# Works exactly like pandas — just swap pd.read_csv for eda.read
-df = eda.read("transactions.csv")
-
-# All normal pandas operations still work
-print(df.head())
-print(df.describe())
-
-# Start with one complete assessment.
-df.noweda.statsall()
-
-# Rank general charts within a bounded panel budget.
-df.noweda.vizall(max_plots=10)
-
-# Add target-aware diagnostics for model-family decisions.
-df.noweda.vizall(target="fraud_flag", max_plots=15)
-
-# State the target or unsupervised objective before requesting ML guidance
-df.noweda.mlall(target="fraud_flag", problem_type="classification")
+df = eda.read("customers.csv")          # Use your file and target column.
+df.eda.statsall()                       # Check missing values and duplicates.
+charts = df.eda.vizall(target="churned")
+df.eda.mlall(target="churned")           # Pick models to try first.
 ```
 
-`vizall(target=...)` visualizes class balance or target distribution, ranks
-feature-target relationships, and reports cautious linear or nonlinear signals.
-It may fit small visual baselines, but does not return a production model or
-claim which estimator will win. See
-[Visual ML Diagnostics](visual-diagnostics.md).
+Install `noweda[viz]` for the charts. For a yes/no outcome, look at where a
+straight or curved boundary makes mistakes. For a numeric outcome, look at
+where a fitted line consistently predicts too high or too low. Each view gives
+you a question to test with your own data. [How to read the charts](visual-diagnostics.md)
 
 ---
 
@@ -97,7 +57,7 @@ formats require an optional dependency extra; see [Installation](installation.md
 | **Duplicates** | Duplicate rows, constant (zero-variance) columns |
 | **Correlation** | Pearson correlation matrix for numeric columns |
 | **Outliers** | IQR-based outlier count per numeric column |
-| **PII** | Email address detection (extensible) |
+| **PII** | Email, phone, SSN and payment-card signals |
 | **Encoding** | Base64 and obfuscation signal detection |
 
 ---

@@ -55,7 +55,7 @@ Scores
 ------------------------------------------------------------
   Data Quality    : 77 out of 100
   Model Readiness : 53 out of 100
-  Risk            : 25  (0 = no risk)
+  Risk            : 25  (0 = no signals detected)
 
 Columns
 ------------------------------------------------------------

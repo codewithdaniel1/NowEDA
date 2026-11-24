@@ -64,8 +64,9 @@ When the target is categorical, boolean, or a low-cardinality integer,
 - numeric distributions split by class; and
 - class shares across categorical feature values;
 - a one-feature logistic probability curve for binary targets; and
-- side-by-side linear and nonlinear RBF-SVM boundaries using two selected
-  numeric features.
+- three views of the same two features: the observed classes, a straight SVM
+  boundary, and a curved SVM boundary. Boolean features appear as groups with
+  their observed class shares and row counts.
 
 The returned evidence can flag class imbalance, weak univariate separation,
 possible leakage, approximately linear structure, and curved or threshold-like
@@ -74,11 +75,16 @@ linear structure may justify testing logistic regression or a linear SVM as a
 baseline, while threshold-like structure may justify comparing tree-based or
 nonlinear-kernel models.
 
-The SVM panels are two-feature projections. They can reveal a useful boundary,
-but they do not describe what the same estimator would learn from every
-available feature. The fit and validation score retain nonmissing finite rows;
-the displayed axes zoom to the central 98% so isolated outliers do not hide the
-boundary.
+**How to read the boundary charts.** Start with the dots on the left. Their
+colors show the actual classes. The middle and right panels shade the class
+each model predicts. A cross marks a wrong prediction on a held-out row.
+Compare where the crosses fall. If the curved boundary corrects mistakes in a
+particular region, that gives you a reason to test it on more data.
+
+Both models use the same two features and the same rows. Balanced accuracy
+averages the fraction correctly identified within each class, so a rare class
+gets equal weight. The axes zoom to the central 98% of each feature. The score
+includes valid held-out rows outside that view.
 
 ## Regression diagnostics
 
@@ -99,7 +105,14 @@ residual behavior, and prediction metrics.
 
 The regression, logistic, SVM, and K-Means overlays fit small diagnostic
 estimators on deterministic bounded samples. Supervised diagnostics use a
-train/validation split and display validation R² or balanced accuracy. K-Means
+75/25 split. Only training rows choose the features, fit the scaling and fit
+the models. The score uses held-out rows with complete values for those
+features. The result records `training_rows` and `validation_rows` per model.
+The fit uses up to 2,000 rows for classification or 3,000 for regression.
+Classification sampling reserves examples from each class. The fitted classifier
+views require at least five observed rows per class.
+For repeated customers or time-ordered predictions, evaluate your chosen model
+with a customer- or time-based split. K-Means
 compares silhouette scores over a small range of `k` values.
 
 These scores describe the displayed feature projection and sample. They are
@@ -166,15 +179,14 @@ print(visuals["scope"])
 ```
 
 Large-mode output announces the sample size, and `scope["sample_based"]`
-identifies whether the result represents a sample. Ordered source files can
-produce an unrepresentative leading sample, so review the scope before acting
-on small differences.
+identifies whether the result represents a sample. Large mode draws rows from across the file with a fixed seed. A small sample can
+still miss a rare class. Increase `sample` to explore it in more detail.
 
 ## How this relates to `mlall()`
 
 `mlall(target=...)` reuses the same association and model-shape evidence in its
-structured plan, keeping written recommendations aligned with
-`vizall(target=...)`:
+structured plan. Its evidence follows the `features` and `problem_type` you
+choose for `mlall()`.
 
 ```python
 plan = df.eda.mlall(target="fraud_flag", plan=True)

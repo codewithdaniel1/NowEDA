@@ -65,7 +65,7 @@ def main():
     print(f"  Data Quality    : {_score_color(dq)} out of 100")
     print(f"  Model Readiness : {_score_color(mr)} out of 100")
     risk_col = f"{_RED}{risk}{_RESET}" if isinstance(risk, (int, float)) and risk > 0 else f"{_GREEN}{risk}{_RESET}"
-    print(f"  Risk            : {risk_col}  (0 = no risk)")
+    print(f"  Risk            : {risk_col}  (0 = no signals detected)")
 
     # ── Column Overview ───────────────────────────────────────────────────────
     print(f"\n{_BOLD}Columns{_RESET}\n{thin}")
@@ -82,7 +82,7 @@ def main():
         print(f"  {str(col):<{col_w}} {dtype:<14} {role:<{role_w}} {uniq:>8} {miss_s:>8}")
 
     # ── Numeric Stats ────────────────────────────────────────────────────────
-    num_cols = [c for c in df.columns if df[c].dtype.kind in ("i", "u", "f")]
+    num_cols = [c for c in df.columns if df[c].dtype.kind in ("i", "u", "f") and c not in results.get("pii", {})]
     if num_cols:
         print(f"\n{_BOLD}Numeric Statistics{_RESET}\n{thin}")
         print(f"  {'Column':<{col_w}} {'Count':>8} {'Mean':>12} {'Std':>12} {'Min':>10} {'25%':>10} {'50%':>10} {'75%':>10} {'Max':>10} {'Skew':>8}")
@@ -113,7 +113,7 @@ def main():
             s     = stats.get(col, {})
             count = s.get("count", 0)
             uniq  = s.get("unique", 0)
-            top   = str(s.get("top_value", "N/A"))[:28]
+            top   = str(s.get("top_value", "Hidden" if col in results.get("pii", {}) else "N/A"))[:28]
             freq  = s.get("top_freq", 0)
             print(f"  {str(col):<{col_w}} {count:>8,} {uniq:>8} {top:<30} {freq:>8,}")
 

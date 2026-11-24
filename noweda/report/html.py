@@ -1,4 +1,5 @@
 from datetime import datetime
+from math import isfinite
 
 
 def generate_html_report(report, output_path):
@@ -27,6 +28,15 @@ def generate_html_report(report, output_path):
     breakdown_html = _score_breakdown_table(report.get("score_breakdown", []))
 
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    scope_html = ""
+    if "large_mode" in report:
+        scope = report["large_mode"]
+        rows, analyzed = scope["rows"], scope["sample_rows"]
+        description = (
+            f"Results use a sample of {analyzed:,} of {rows:,} rows drawn across the file."
+            if analyzed < rows else f"Results use all {rows:,} rows."
+        )
+        scope_html = f'<p>{description} The file has {scope["columns"]:,} columns.</p>'
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -86,6 +96,7 @@ def generate_html_report(report, output_path):
   <div class="header">
     <h1>NowEDA Report</h1>
     <div class="meta">Generated: {generated_at}</div>
+    {scope_html}
   </div>
 
   <div class="scores-grid">
@@ -97,7 +108,7 @@ def generate_html_report(report, output_path):
     <div class="score-card">
       <div class="label">Risk Level</div>
       <div class="value" style="color:{risk_color}">{risk}</div>
-      <div class="sub">higher = more risk</div>
+      <div class="sub">0 = no signals detected</div>
     </div>
     <div class="score-card">
       <div class="label">Model Readiness</div>
@@ -200,6 +211,9 @@ def _missing_table(missing):
         return ""
     rows = ""
     for col, pct in sorted(missing.items(), key=lambda x: -x[1]):
+        if not isfinite(pct):
+            rows += f"<tr><td>{_escape(col)}</td><td>No observations</td></tr>"
+            continue
         pct_int = int(pct * 100)
         bar_color = "#f87171" if pct > 0.3 else ("#facc15" if pct > 0 else "#4ade80")
         bar = (

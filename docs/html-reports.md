@@ -23,6 +23,8 @@ noweda data.csv --html report.html
 
 ---
 
+Large-mode HTML reports show how many rows were analyzed and the full file dimensions. Empty columns in a zero-row table show “No observations” for missingness.
+
 ## Report Sections
 
 ### Score Cards

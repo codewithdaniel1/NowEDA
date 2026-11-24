@@ -4,7 +4,20 @@ All notable changes to NowEDA are documented here.
 
 ---
 
-## [0.2.3] — Unreleased
+## Unreleased
+
+- Classifier charts show observed classes, straight and curved boundaries, and
+  mistakes on the same held-out rows. Fitted charts select features using the training rows.
+- Yes/no features show class shares and group sizes. Visual evidence in
+  `mlall()` follows the requested features and prediction task.
+- Large-mode samples draw from across the file. HTML reports show the sample
+  size and handle tables with zero rows.
+- Numeric phone, SSN and card columns with identifying names are checked for
+  personal data signals. Built-in reports hide example values for flagged columns.
+
+---
+
+## [0.2.3]
 
 ### Added
 

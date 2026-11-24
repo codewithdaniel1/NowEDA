@@ -1,5 +1,6 @@
 """Pattern-based PII signals, counted once per matching cell and type."""
 import re
+import math
 
 from noweda.dtypes import is_textual
 from .base import BasePlugin
@@ -22,6 +23,11 @@ class PIIDetectorPlugin(BasePlugin):
         findings = {}
         patterns = dict(self.PATTERNS)
         for col in df.columns:
+            if df[col].dtype.kind in ("i", "u", "f"):
+                finding = self._numeric_signal(col, df[col])
+                if finding:
+                    findings[col] = finding
+                continue
             if not is_textual(df[col]):
                 continue
             counts = dict.fromkeys(patterns, 0)
@@ -42,6 +48,33 @@ class PIIDetectorPlugin(BasePlugin):
             if any(counts.values()):
                 findings[col] = {kind: count for kind, count in counts.items() if count}
         return findings
+
+    def _numeric_signal(self, column, series):
+        # CSV readers often infer phone and card columns as numbers.
+        name = re.sub(r"([a-z])([A-Z])", r"\1_\2", str(column)).lower()
+        words = set(re.findall(r"[a-z]+", name))
+        if words & {"phone", "telephone", "mobile", "cellphone"}:
+            kind = "phone"
+        elif "card" in words:
+            kind = "credit_card"
+        elif "ssn" in words:
+            kind = "ssn"
+        else:
+            return {}
+        count = 0
+        for value in series.dropna():
+            if series.dtype.kind == "f" and (
+                not math.isfinite(value) or not value.is_integer() or abs(value) >= 2**53
+            ):
+                continue
+            digits = str(int(value))
+            if kind == "credit_card":
+                count += self._valid_card(digits)
+            elif kind == "phone":
+                count += bool(re.fullmatch(r"1?[0-9]{10}", digits))
+            else:
+                count += bool(re.fullmatch(r"[0-9]{9}", digits))
+        return {kind: count} if count else {}
 
     def _valid_card(self, value):
         digits = re.sub(r"[ -]", "", value)

@@ -108,7 +108,7 @@ def _entropy_score(series: pd.Series) -> float:
 
 
 def _association(feature: pd.Series, target: pd.Series, problem_type: str) -> float:
-    feature_numeric = pd.api.types.is_numeric_dtype(feature.dtype)
+    feature_numeric = pd.api.types.is_numeric_dtype(feature.dtype) and not pd.api.types.is_bool_dtype(feature.dtype)
     if problem_type == "regression":
         if feature_numeric:
             return _rank_correlation(feature, target)
@@ -173,6 +173,7 @@ def build_visual_diagnostics(
     report: dict,
     *,
     target: Any = None,
+    problem_type: Optional[str] = None,
 ) -> dict:
     """Return ranked evidence for visualization and ML guidance."""
     if not df.columns.is_unique:
@@ -182,7 +183,6 @@ def build_visual_diagnostics(
     schema = results.get("schema", {})
     pii_columns = set(results.get("pii", {}))
     target_series = None
-    problem_type = None
     target_reason = None
     target_position = None
 
@@ -194,7 +194,10 @@ def build_visual_diagnostics(
             target_series = target_series.replace([np.inf, -np.inf], np.nan)
         if target_series.dropna().empty:
             raise ValueError("Target column {!r} has no observed values.".format(target))
-        problem_type, target_reason = _infer_supervised_type(target_series)
+        if problem_type is None:
+            problem_type, target_reason = _infer_supervised_type(target_series)
+        else:
+            target_reason = "using the selected prediction task"
 
     numeric = []
     categorical = []
@@ -213,7 +216,10 @@ def build_visual_diagnostics(
         if role == "datetime" or pd.api.types.is_datetime64_any_dtype(series.dtype):
             datetime.append(column)
             continue
-        if pd.api.types.is_numeric_dtype(series.dtype):
+        if pd.api.types.is_bool_dtype(series.dtype):
+            categorical.append(column)
+            kind = "categorical"
+        elif pd.api.types.is_numeric_dtype(series.dtype):
             numeric.append(column)
             kind = "numeric"
         elif is_textual(series) and series.nunique(dropna=True) <= 30:
@@ -297,9 +303,6 @@ def build_visual_diagnostics(
                 .format(", ".join(_label(column) for column in leakage_candidates[:3]))
             )
         for column in ranked_numeric[:10]:
-            score = next(
-                item["score"] for item in associations if item["column"] == column
-            )
             if column in leakage_candidates:
                 continue
             shape = _numeric_shape(df[column], target_series, problem_type)
@@ -421,27 +424,46 @@ def _sklearn_tools():
     }
 
 
-def _bounded_classification_sample(frame: pd.DataFrame, limit: int) -> pd.DataFrame:
-    """Return a deterministic bounded sample while retaining small classes."""
-    frame = frame.reset_index(drop=True)
-    if len(frame) <= limit:
-        return frame
+def _diagnostic_split(df, target, problem_type, tools):
+    """Reserve validation rows before ranking predictors or fitting any model."""
+    outcome = df[target].replace([np.inf, -np.inf], np.nan)
+    positions = np.flatnonzero(outcome.notna().to_numpy())
+    classification = problem_type == "classification"
+    classes = outcome.nunique()
+    if len(positions) < 10 or (classification and not 2 <= classes <= 6):
+        return None
+    limit = 2_000 if classification else 3_000
+    required = []
     rng = np.random.RandomState(42)
-    selected = []
-    for indices in frame.groupby("target", sort=False).groups.values():
-        positions = np.asarray(list(indices), dtype=int)
-        amount = min(
-            len(positions),
-            max(10, int(round(limit * len(positions) / len(frame)))),
-        )
-        selected.extend(rng.choice(positions, size=amount, replace=False).tolist())
-    if len(selected) > limit:
-        selected = rng.choice(np.asarray(selected), size=limit, replace=False).tolist()
-    elif len(selected) < limit:
-        remaining = np.setdiff1d(np.arange(len(frame)), np.asarray(selected), assume_unique=False)
-        extra = rng.choice(remaining, size=min(limit - len(selected), len(remaining)), replace=False)
-        selected.extend(extra.tolist())
-    return frame.iloc[sorted(selected)].reset_index(drop=True)
+    if classification:
+        # Keep enough examples per observed class for a stratified split,
+        # including when a rare class would disappear from a uniform sample.
+        for group in outcome.groupby(outcome, observed=True, sort=False).indices.values():
+            if len(group) < 5:
+                return None
+            if len(positions) > limit:
+                required.extend(rng.choice(group, size=5, replace=False))
+    if len(positions) > limit:
+        remaining = np.setdiff1d(positions, required, assume_unique=True)
+        extra = rng.choice(remaining, limit - len(required), replace=False)
+        positions = np.concatenate((np.asarray(required, dtype=int), extra))
+    labels = outcome.iloc[positions]
+    train, valid = tools["train_test_split"](
+        positions, test_size=0.25, random_state=42,
+        stratify=labels if classification else None,
+    )
+    return df.iloc[train], df.iloc[valid]
+
+
+def _model_rows(split, target, columns):
+    # Give sklearn string feature names even when pandas column labels are tuples.
+    names = ["feature", "target"] if len(columns) == 1 else ["left", "right", "target"]
+    frames = []
+    for frame in split:
+        subset = frame[columns + [target]].replace([np.inf, -np.inf], np.nan).dropna()
+        subset.columns = names
+        frames.append(subset)
+    return frames
 
 
 def _model_numeric_features(diagnostics: dict) -> list:
@@ -467,16 +489,11 @@ def _boundary_features(diagnostics: dict, model_numeric: list) -> list:
     return [companion, curved] if companion is not None else [curved]
 
 
-def _regression_diagnostic(plt, df, target, feature, tools):
-    pairs = pd.DataFrame({"feature": df[feature], "target": df[target]})
-    pairs = pairs.replace([np.inf, -np.inf], np.nan).dropna()
-    if len(pairs) < 40 or pairs["feature"].nunique() < 5:
+def _regression_diagnostic(plt, split, target, feature, tools):
+    train, validation = _model_rows(split, target, [feature])
+    if len(train) < 30 or len(validation) < 2 or train["feature"].nunique() < 5:
         return None
-    if len(pairs) > 3_000:
-        pairs = pairs.sample(n=3_000, random_state=42)
-    train, validation = tools["train_test_split"](
-        pairs, test_size=0.25, random_state=42
-    )
+    pairs = pd.concat([train, validation])
     model = tools["LinearRegression"]()
     model.fit(train[["feature"]], train["target"])
     predicted = model.predict(validation[["feature"]])
@@ -496,8 +513,8 @@ def _regression_diagnostic(plt, df, target, feature, tools):
     axes[1].scatter(predicted, residuals, alpha=0.38, s=16, color="#55A868")
     axes[1].axhline(0, color="#E24A33", linewidth=2)
     axes[1].set_xlabel("Predicted {}".format(_label(target)))
-    axes[1].set_ylabel("Residual")
-    axes[1].set_title("Validation residuals")
+    axes[1].set_ylabel("Actual value minus predicted value")
+    axes[1].set_title("Held-out errors · zero is an exact prediction")
     fig.suptitle(
         "Linear regression diagnostic · {} · validation R² {:.2f}".format(
             _label(feature), score
@@ -511,6 +528,8 @@ def _regression_diagnostic(plt, df, target, feature, tools):
         "model": "linear_regression",
         "features": [feature],
         "rows": int(len(pairs)),
+        "training_rows": len(train),
+        "validation_rows": len(validation),
         "validation_metric": "r2",
         "validation_score": round(score, 4),
         "scope": "diagnostic train/validation fit",
@@ -518,18 +537,16 @@ def _regression_diagnostic(plt, df, target, feature, tools):
     return fig, record
 
 
-def _logistic_diagnostic(plt, df, target, feature, tools):
-    pairs = pd.DataFrame({"feature": df[feature], "target": df[target]})
-    pairs = pairs.replace([np.inf, -np.inf], np.nan).dropna()
-    if pairs["target"].nunique() != 2 or pairs["feature"].nunique() < 5:
+def _logistic_diagnostic(plt, split, target, feature, tools):
+    train, valid = _model_rows(split, target, [feature])
+    counts = train["target"].value_counts()
+    labels = counts[counts > 0].index
+    if len(labels) != 2 or valid["target"].nunique() != 2 or train["feature"].nunique() < 5:
         return None
-    pairs = _bounded_classification_sample(pairs, 3_000)
-    codes, labels = pd.factorize(pairs["target"], sort=False)
-    if np.bincount(codes).min() < 5:
-        return None
-    train_x, valid_x, train_y, valid_y = tools["train_test_split"](
-        pairs[["feature"]], codes, test_size=0.25, random_state=42, stratify=codes
-    )
+    train_x, valid_x = train[["feature"]], valid[["feature"]]
+    train_y = pd.Categorical(train["target"], categories=labels).codes
+    valid_y = pd.Categorical(valid["target"], categories=labels).codes
+    pairs = pd.concat([train, valid])
     model = tools["make_pipeline"](
         tools["StandardScaler"](), tools["LogisticRegression"](max_iter=500)
     )
@@ -560,8 +577,8 @@ def _logistic_diagnostic(plt, df, target, feature, tools):
     ax.set_ylabel("Probability of {}".format(_label(labels[1])))
     ax.set_ylim(-0.08, 1.08)
     ax.set_title(
-        "Logistic diagnostic · validation balanced accuracy {:.2f}\n"
-        "One-feature visual baseline; final models may use more features".format(score)
+        "How does the chance of {} change with {}?\n"
+        "Logistic regression · held-out balanced accuracy {:.0%}".format(labels[1], feature, score)
     )
     ax.legend()
     fig.tight_layout()
@@ -570,6 +587,8 @@ def _logistic_diagnostic(plt, df, target, feature, tools):
         "model": "logistic_regression",
         "features": [feature],
         "rows": int(len(pairs)),
+        "training_rows": len(train),
+        "validation_rows": len(valid),
         "validation_metric": "balanced_accuracy",
         "validation_score": round(score, 4),
         "scope": "one-feature diagnostic train/validation fit",
@@ -577,21 +596,18 @@ def _logistic_diagnostic(plt, df, target, feature, tools):
     return fig, record
 
 
-def _svm_diagnostic(plt, df, target, features, tools):
-    left, right = features[:2]
-    pairs = pd.DataFrame({"left": df[left], "right": df[right], "target": df[target]})
-    pairs = pairs.replace([np.inf, -np.inf], np.nan).dropna()
-    classes = pairs["target"].nunique()
-    if classes < 2 or classes > 6 or pairs["left"].nunique() < 4 or pairs["right"].nunique() < 4:
+def _svm_diagnostic(plt, split, target, features, tools):
+    left, right = features
+    train, valid = _model_rows(split, target, features)
+    labels = pd.Index(train["target"].unique())
+    classes = len(labels)
+    if (classes != split[0][target].nunique() or set(valid["target"]) != set(labels)
+            or train["left"].nunique() < 4 or train["right"].nunique() < 4):
         return None
-    pairs = _bounded_classification_sample(pairs, 2_000)
-    codes, labels = pd.factorize(pairs["target"], sort=False)
-    if np.bincount(codes).min() < 5:
-        return None
-    train_x, valid_x, train_y, valid_y = tools["train_test_split"](
-        pairs[["left", "right"]], codes, test_size=0.25,
-        random_state=42, stratify=codes,
-    )
+    train_x, valid_x = train[["left", "right"]], valid[["left", "right"]]
+    train_y = pd.Categorical(train["target"], categories=labels).codes
+    valid_y = pd.Categorical(valid["target"], categories=labels).codes
+    pairs = pd.concat([train, valid])
     lower_left, upper_left = pairs["left"].quantile([0.01, 0.99])
     lower_right, upper_right = pairs["right"].quantile([0.01, 0.99])
     if lower_left == upper_left or lower_right == upper_right:
@@ -605,56 +621,54 @@ def _svm_diagnostic(plt, df, target, features, tools):
         ("linear_svm", "Linear SVM", tools["SVC"](kernel="linear", class_weight="balanced")),
         ("rbf_svm", "Nonlinear RBF-SVM", tools["SVC"](kernel="rbf", class_weight="balanced")),
     )
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5), sharex=True, sharey=True)
     records = []
-    # Keep extreme values in the fitted diagnostic, but zoom the visual panel
-    # to the central 98% so a handful of showcase outliers cannot flatten the
-    # decision surface and hide its shape.
-    display = pairs.loc[
-        pairs["left"].between(lower_left, upper_left)
-        & pairs["right"].between(lower_right, upper_right)
-    ]
-    display = display.sample(n=min(800, len(display)), random_state=42)
-    display_codes = pd.Categorical(display["target"], categories=labels).codes
-    for ax, (key, title, estimator) in zip(axes, models):
-        model = tools["make_pipeline"](tools["StandardScaler"](), estimator)
-        model.fit(train_x, train_y)
-        score = float(tools["balanced_accuracy_score"](valid_y, model.predict(valid_x)))
-        surface = model.predict(grid).reshape(x_grid.shape)
-        ax.contourf(x_grid, y_grid, surface, levels=np.arange(classes + 1) - 0.5,
-                    cmap="Pastel1", alpha=0.72)
+    colors = [plt.cm.tab10(i) for i in range(classes)]
+    # All panels show exactly the same held-out observations and axis limits.
+    for ax in axes:
         for code, label in enumerate(labels):
-            class_rows = display.iloc[np.flatnonzero(display_codes == code)]
-            ax.scatter(
-                class_rows["left"], class_rows["right"],
-                color=plt.cm.tab10(code % 10),
-                alpha=0.82,
-                s=30 if code else 20,
-                edgecolors="white",
-                linewidths=0.35,
-                label=_label(label),
-                zorder=3 + code,
-            )
+            points = valid_x.iloc[np.flatnonzero(valid_y == code)]
+            ax.scatter(points["left"], points["right"], color=colors[code], s=22,
+                       edgecolors="white", linewidths=0.4, label=_label(label), zorder=2)
         ax.set_xlabel(_label(left))
-        ax.set_ylabel(_label(right))
         ax.set_xlim(float(lower_left), float(upper_left))
         ax.set_ylim(float(lower_right), float(upper_right))
-        ax.set_title("{} · balanced accuracy {:.2f}".format(title, score))
-        ax.legend(fontsize=8, title=_label(target))
+    axes[0].set_ylabel(_label(right))
+    axes[0].set_title("Observed classes")
+    axes[0].legend(fontsize=8, title=_label(target))
+    for ax, (key, title, estimator) in zip(axes[1:], models):
+        model = tools["make_pipeline"](tools["StandardScaler"](), estimator)
+        model.fit(train_x, train_y)
+        predicted = model.predict(valid_x)
+        score = float(tools["balanced_accuracy_score"](valid_y, predicted))
+        surface = model.predict(grid).reshape(x_grid.shape)
+        ax.contourf(x_grid, y_grid, surface, levels=np.arange(classes + 1) - 0.5,
+                    colors=colors, alpha=0.22, zorder=0)
+        mistakes = valid_x.iloc[np.flatnonzero(valid_y != predicted)]
+        ax.scatter(mistakes["left"], mistakes["right"], marker="x", color=ax.xaxis.label.get_color(),
+                   s=36, linewidths=1.2, zorder=3)
+        ax.set_title("{}\nBalanced accuracy {:.0%}".format(title, score))
         records.append({
             "model": key,
             "features": [left, right],
             "rows": int(len(pairs)),
+            "training_rows": len(train),
+            "validation_rows": len(valid),
             "validation_metric": "balanced_accuracy",
             "validation_score": round(score, 4),
             "scope": "two-feature diagnostic train/validation fit",
         })
     fig.suptitle(
-        "Two-feature decision boundaries · diagnostic projection only",
+        "Can a straight boundary separate these classes?\n"
+        "Dots show held-out rows. Shading shows predictions. × marks a mistake.",
         fontsize=14,
         fontweight="bold",
     )
-    fig.tight_layout()
+    fig.text(0.5, 0.02,
+             "Balanced accuracy gives each class equal weight. Always predicting one class scores {:.0%}.\n"
+             "Scored on {:,} held-out rows. Axes show the middle 98% of each feature.".format(1 / classes, len(valid)),
+             ha="center", fontsize=9)
+    fig.tight_layout(rect=(0, 0.10, 1, 1))
     plt.show()
     return fig, records
 
@@ -802,6 +816,68 @@ def render_vizall(
         plt.show()
         register(fig, 1, title)
 
+    # Small diagnostic estimators make model shape visible. They use bounded,
+    # deterministic samples and are deliberately labeled as visual baselines.
+    split = None
+    model_numeric = []
+    if target is not None and diagnostic_tools and budget.remaining:
+        split = _diagnostic_split(df, target, problem_type, diagnostic_tools)
+    if split is not None:
+        from noweda.plugins.schema import SchemaPlugin
+
+        train, _ = split
+        private_columns = report.get("results", {}).get("pii", {})
+        candidates = [col for col in train.select_dtypes(include="number")
+                      if col != target and col not in private_columns]
+        train_frame = train[candidates + [target]]
+        train_report = {"results": {"schema": SchemaPlugin().run(train_frame)}}
+        training_evidence = build_visual_diagnostics(
+            train_frame, train_report, target=target, problem_type=problem_type
+        )
+        model_numeric = _model_numeric_features(training_evidence)
+    if diagnostic_tools is None:
+        diagnostics["observations"].append(
+            "Install noweda[viz] to include fitted model overlays."
+        )
+    elif split is not None and problem_type == "regression":
+        if budget.remaining >= 2 and model_numeric:
+            rendered = _regression_diagnostic(
+                plt, split, target, model_numeric[0], diagnostic_tools
+            )
+            if rendered is not None:
+                fig, record = rendered
+                budget.take(2)
+                diagnostics["diagnostic_models"].append(record)
+                register(fig, 2, "Linear regression fit and residuals", model_numeric[:1])
+    elif split is not None and problem_type == "classification":
+        classes = target_series.nunique(dropna=True)
+        if classes == 2 and budget.remaining >= 1 and model_numeric:
+            rendered = _logistic_diagnostic(
+                plt, split, target, model_numeric[0], diagnostic_tools
+            )
+            if rendered is not None:
+                fig, record = rendered
+                budget.take(1)
+                diagnostics["diagnostic_models"].append(record)
+                register(fig, 1, "Logistic probability curve", model_numeric[:1])
+        boundary_features = _boundary_features(training_evidence, model_numeric)
+        if budget.remaining >= 3 and len(boundary_features) >= 2:
+            rendered = _svm_diagnostic(
+                plt, split, target, boundary_features, diagnostic_tools
+            )
+            if rendered is not None:
+                fig, records = rendered
+                budget.take(3)
+                diagnostics["diagnostic_models"].extend(records)
+                register(fig, 3, "Linear and nonlinear SVM boundaries", boundary_features)
+    elif target_series is None and budget.remaining >= 2 and diagnostic_tools is not None:
+        rendered = _clustering_diagnostic(plt, df, diagnostics, diagnostic_tools)
+        if rendered is not None:
+            fig, record = rendered
+            budget.take(2)
+            diagnostics["diagnostic_models"].append(record)
+            register(fig, 2, "PCA and K-Means cluster diagnostic", record["features"])
+
     # The strongest target relationships receive a reserved part of the budget.
     if target_series is not None and numeric and budget.remaining:
         count = budget.take(min(3, len(numeric)))
@@ -860,10 +936,16 @@ def render_vizall(
             pairs = pairs.replace([np.inf, -np.inf], np.nan).dropna()
             top_levels = list(pairs["feature"].value_counts().head(12).index)
             pairs = pairs[pairs["feature"].isin(top_levels)]
+            if pairs.empty:
+                ax.set_title(_label(column))
+                ax.text(0.5, 0.5, "No observed pairs", ha="center", transform=ax.transAxes)
+                continue
             if problem_type == "classification":
                 table = pd.crosstab(pairs["feature"], pairs["target"], normalize="index")
                 table.plot(kind="bar", stacked=True, ax=ax, colormap="tab10", legend=True)
-                ax.set_ylabel("Class share")
+                support = pairs["feature"].value_counts()
+                ax.set_xticklabels(["{} (n={:,})".format(level, support[level]) for level in table.index])
+                ax.set_ylabel("Observed class share")
                 ax.legend(title=_label(target), fontsize=7)
             else:
                 means = pairs.groupby("feature", observed=True)["target"].mean().sort_values(ascending=False)
@@ -876,52 +958,6 @@ def render_vizall(
         title = "Top categorical target relationships"
         _finish_grid(plt, fig, axes, grid_columns, grid_rows, count, title)
         register(fig, count, title, columns_to_plot)
-
-    # Small diagnostic estimators make model shape visible. They use bounded,
-    # deterministic samples and are deliberately labeled as visual baselines.
-    model_numeric = _model_numeric_features(diagnostics)
-    if diagnostic_tools is None and ((target_series is not None and model_numeric) or target is None):
-        diagnostics["observations"].append(
-            "Fitted model overlays require scikit-learn; install noweda[viz] or noweda[ml]."
-        )
-    elif target_series is not None and problem_type == "regression":
-        if budget.remaining >= 2 and model_numeric:
-            rendered = _regression_diagnostic(
-                plt, df, target, model_numeric[0], diagnostic_tools
-            )
-            if rendered is not None:
-                fig, record = rendered
-                budget.take(2)
-                diagnostics["diagnostic_models"].append(record)
-                register(fig, 2, "Linear regression fit and residuals", model_numeric[:1])
-    elif target_series is not None and problem_type == "classification":
-        classes = target_series.nunique(dropna=True)
-        if classes == 2 and budget.remaining >= 1 and model_numeric:
-            rendered = _logistic_diagnostic(
-                plt, df, target, model_numeric[0], diagnostic_tools
-            )
-            if rendered is not None:
-                fig, record = rendered
-                budget.take(1)
-                diagnostics["diagnostic_models"].append(record)
-                register(fig, 1, "Logistic probability curve", model_numeric[:1])
-        boundary_features = _boundary_features(diagnostics, model_numeric)
-        if budget.remaining >= 2 and len(boundary_features) >= 2:
-            rendered = _svm_diagnostic(
-                plt, df, target, boundary_features, diagnostic_tools
-            )
-            if rendered is not None:
-                fig, records = rendered
-                budget.take(2)
-                diagnostics["diagnostic_models"].extend(records)
-                register(fig, 2, "Linear and nonlinear SVM boundaries", boundary_features)
-    elif target_series is None and budget.remaining >= 2 and diagnostic_tools is not None:
-        rendered = _clustering_diagnostic(plt, df, diagnostics, diagnostic_tools)
-        if rendered is not None:
-            fig, record = rendered
-            budget.take(2)
-            diagnostics["diagnostic_models"].append(record)
-            register(fig, 2, "PCA and K-Means cluster diagnostic", record["features"])
 
     results = report.get("results", {})
     missing_columns = [column for column in numeric + categorical + datetime if df[column].isna().any()]

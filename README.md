@@ -6,9 +6,7 @@
 
 # NowEDA
 
-Exploratory data analysis through a native pandas accessor. Profile columns,
-find missing data and duplicates, flag potential PII, explore relationships,
-and generate reports with `df.eda` or its equivalent alias `df.noweda`.
+NowEDA helps you explore a pandas table and choose a first machine learning model to try. Use `df.eda` to inspect your data, see how columns relate to an outcome, and get a shortlist of models to test.
 
 [Documentation](https://codewithdaniel1.github.io/NowEDA/) ·
 [API reference](https://codewithdaniel1.github.io/NowEDA/api-reference/) ·
@@ -27,31 +25,28 @@ pip install "noweda[viz]"  # Add charts and density overlays
 
 ## Quick start
 
-This example runs without downloading a dataset:
+Which flower species can we predict from its measurements? In this example, the
+**target** is the species we want to predict. The **features** are the measurements
+we will know when we make a prediction.
+
+Install `noweda[viz]` for this example. The flower dataset comes with scikit-learn
+and runs offline.
 
 ```python
-import pandas as pd
 import noweda as eda
+from sklearn.datasets import load_iris
 
-# Or load your own file: df = eda.read("data.csv")
-df = pd.DataFrame({
-    "age": [25, 31, None, 42],
-    "income": [42000, 55000, 47000, 68000],
-    "segment": ["A", "B", "A", "B"],
-})
-
-# Start with one complete assessment.
-df.eda.statsall()
-
-# With noweda[viz], rank general charts within a panel budget.
-# df.eda.vizall(max_plots=10)
-
-# Add target-aware diagnostics for model-family decisions.
-# df.eda.vizall(target="segment", max_plots=15)
-
-# Name an outcome before asking for supervised ML guidance.
-# df.eda.mlall(target="segment")
+df = load_iris(as_frame=True).frame   # For your own table: eda.read("flowers.csv")
+df.eda.statsall()                     # Are there missing values or duplicates?
+charts = df.eda.vizall(target="target")
+df.eda.mlall(target="target")          # Which models are worth trying first?
 ```
+
+In the boundary charts, each dot is a flower the models did not see during
+training. Look for crosses where a model predicted the wrong species. If a
+straight boundary and a curved boundary make similar mistakes, try the simpler
+linear model first. A prediction of a number, such as a price, is a regression
+task. Its chart shows how far each prediction falls from the observed value.
 
 ### Large files
 
@@ -67,8 +62,8 @@ data.eda.mlall(target="fraud_flag")
 ```
 
 Large mode calculates the dataset dimensions exactly. Exploratory findings,
-charts, profiles, comparisons, and ML guidance use a bounded sample and print
-its size before running, so estimates are never presented as full-data results.
+charts, profiles, comparisons, and ML guidance use a repeatable sample drawn
+from across the file. Each method prints how many rows it used.
 `statsall()`, `vizall()`, and `mlall()` use `sample=10_000` by default in large
 mode; pass another positive integer to adjust that scope. In small mode those
 methods use every loaded row by default, and accept the same `sample=` override.

@@ -102,6 +102,9 @@ def test_empty_reports_are_informative(frame, capsys, tmp_path):
     report = frame.eda.report()
     assert "Scores are not informative" in report["insights"][0]
     generate_json_report(report, tmp_path / "empty.json")
+    generate_html_report(report, tmp_path / "empty.html")
+    if len(frame.columns):
+        assert "No observations" in (tmp_path / "empty.html").read_text()
 
 
 def test_duplicate_column_labels_fail_clearly():
@@ -213,3 +216,32 @@ def test_score_breakdown_reconciles_including_clamp():
         assert start + sum(rule["contributions"][name] for rule in report["score_breakdown"]) == report["scores"][name]
     assert report["scores"]["data_quality"] == 0
     assert report["scores"] == Scorer().compute(report["results"])
+
+
+def test_numeric_pii_is_contextual_and_raw_values_stay_out_of_reports(tmp_path, capsys, monkeypatch):
+    import sys
+    from noweda.cli import main
+
+    frame = pd.DataFrame({
+        "homePhone": pd.array([2025550101, None], dtype="Int64"),
+        "payment_card": [4111111111111111, 4111111111111112],
+        "contact_email": ["someone@example.org", None],
+        "order_number": [2025550123, 2025550124],
+    })
+    path = tmp_path / "contacts.csv"
+    frame.to_csv(path, index=False)
+    output = tmp_path / "report.json"
+    monkeypatch.setattr(sys, "argv", ["noweda", str(path), "--json", str(output)])
+    main()
+    report = json.loads(output.read_text())
+    assert report["results"]["pii"] == {
+        "homePhone": {"phone": 1}, "payment_card": {"credit_card": 1}, "contact_email": {"email": 1}
+    }
+    assert report["scores"]["risk"] == 45
+    assert report["results"]["stats"]["order_number"]["max"] == 2025550124
+    frame.eda.statsall()
+    frame.eda.profile_column("homePhone")
+    output_text = capsys.readouterr().out + output.read_text()
+    assert "0 = no signals detected" in output_text
+    for private_value in ["someone@example.org", "4111111111111111", "2025550101"]:
+        assert private_value not in output_text

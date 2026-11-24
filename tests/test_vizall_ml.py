@@ -281,3 +281,79 @@ def test_vizall_ignores_unused_target_categories_for_imbalance():
 
     assert result["target_summary"]["classes"] == 2
     assert not any("Class imbalance" in item for item in result["observations"])
+
+
+def test_mlall_visual_evidence_honors_selected_task_and_features():
+    frame = pd.DataFrame({
+        "sales": np.linspace(0, 2, 120), "rating": [1, 2, 3, 4] * 30,
+        "future_outcome": [1, 2, 3, 4] * 30,
+    })
+    plan = frame.eda.mlall(target="rating", problem_type="regression", features=["sales"], plan=True)
+    evidence = plan["visual_diagnostics"]
+    assert evidence["problem_type"] == "regression"
+    assert [item["column"] for item in evidence["associations"]] == ["sales"]
+    assert "future_outcome" not in str(evidence)
+
+
+def test_model_feature_selection_cannot_use_validation_labels():
+    from sklearn.model_selection import train_test_split
+
+    rng = np.random.RandomState(8)
+    y = rng.normal(size=240)
+    _, holdout = train_test_split(np.arange(len(y)), test_size=0.25, random_state=42)
+    # On training rows this is a copy of the target. On all rows it looks like
+    # an ordinary strong predictor. Only training rows should drive selection.
+    proxy = y.copy()
+    proxy[holdout] = rng.normal(size=len(holdout))
+    frame = pd.DataFrame({"proxy": proxy, "input": y + rng.normal(size=len(y)) * 2, "outcome": y},
+                         index=[0] * len(y))
+    result = frame.eda.vizall(target="outcome", max_plots=3)
+    assert result["associations"][0]["column"] == "proxy"
+    model, = result["diagnostic_models"]
+    assert model["features"] == ["input"]
+    assert model["validation_rows"] == len(holdout)
+
+
+@pytest.mark.parametrize("dtype", ["bool", "boolean"])
+def test_boolean_feature_shows_observed_shares_and_group_sizes(dtype):
+    feature = pd.Series([True, False] * 30, dtype=dtype)
+    if dtype == "boolean":
+        feature.iloc[0] = pd.NA
+    frame = pd.DataFrame({"member": feature, "renewed": [0, 0, 1, 1] * 15})
+    result = frame.eda.vizall(target="renewed", max_plots=2)
+    assert result["categorical_features"] == ["member"]
+    ax = result["figures"][1].axes[0]
+    assert ax.get_ylabel() == "Observed class share"
+    assert [label.get_text() for label in ax.get_xticklabels()] == [
+        "False (n=30)", "True (n={})".format(feature.sum())
+    ]
+
+
+def test_svm_comparison_draws_same_held_out_rows_and_marks_mistakes():
+    frame = _classification_frame(rows=360)
+    result = frame.eda.vizall(target="fraud_flag", max_plots=5)
+    models = [m for m in result["diagnostic_models"] if m["model"] in {"linear_svm", "rbf_svm"}]
+    assert len(models) == 2
+    assert models[0]["features"] == models[1]["features"]
+    assert [m["validation_rows"] for m in models] == [90, 90]
+    fig = result["figures"][result["plot_titles"].index("Linear and nonlinear SVM boundaries")]
+    observed, linear, curved = fig.axes
+    assert result["plots_generated"] == 5
+    for ax in (linear, curved):
+        assert ax.get_xlim() == observed.get_xlim()
+        for group in observed.collections:
+            shown = next(item for item in ax.collections if item.get_label() == group.get_label())
+            np.testing.assert_array_equal(shown.get_offsets(), group.get_offsets())
+        assert len(ax.collections[-1].get_offsets()) > 0
+
+
+def test_bounded_classifier_diagnostics_keep_rare_observed_classes():
+    rng = np.random.RandomState(23)
+    frame = pd.DataFrame({
+        "activity": rng.normal(size=6000),
+        "outcome": [None] * 10 + ["ordinary"] * 5985 + ["rare"] * 5,
+    })
+    result = frame.eda.vizall(target="outcome", max_plots=2)
+    model, = result["diagnostic_models"]
+    assert model["model"] == "logistic_regression"
+    assert model["rows"] == 2000

@@ -147,7 +147,7 @@ df_safe.noweda.score()
 {'data_quality': 91, 'risk': 0, 'model_readiness': 85}
 ```
 
-Risk is now 0. Safe to share.
+A score of 0 means the scan found no configured signals. Review the cleaned data and the intended recipients before sharing.
 
 ---
 

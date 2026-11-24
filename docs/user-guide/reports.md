@@ -254,6 +254,8 @@ A flat list of human-readable strings, ordered by category:
 
 ## Exporting Reports
 
+Built-in reports keep counts and hide example values for columns flagged by the personal data detector. Large-mode reports include the number of analyzed rows and the full file dimensions.
+
 ### To JSON
 
 ```python
