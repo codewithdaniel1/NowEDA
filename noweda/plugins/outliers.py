@@ -6,7 +6,7 @@ class OutlierPlugin(BasePlugin):
     def run(self, df):
         result = {}
 
-        for col in df.select_dtypes(include="number").columns:
+        for col in df.select_dtypes(include="number", exclude="bool").columns:
             q1 = df[col].quantile(0.25)
             q3 = df[col].quantile(0.75)
             iqr = q3 - q1

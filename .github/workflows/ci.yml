@@ -33,6 +33,9 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Install test dependencies
+        env:
+          # Use the latest compatible wheel on Python 3.8 to avoid a DuckDB source build.
+          PIP_ONLY_BINARY: ${{ matrix.python == '3.8' && 'duckdb' || '' }}
         run: python -m pip install ".[test]" "${{ matrix.pandas }}" "${{ matrix.numpy }}"
       - name: Test
         env:

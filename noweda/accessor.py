@@ -790,8 +790,9 @@ class NowEDAAccessor:
 
             target_values = self._df.iloc[:, self._df.columns.get_loc(target)]
             if target_values.notna().any():
+                positions = [self._df.columns.get_loc(column) for column in result["features"] + [target]]
                 visual = build_visual_diagnostics(
-                    self._df[result["features"] + [target]], self._report,
+                    self._df.iloc[:, positions], self._report,
                     target=target, problem_type=result["problem_type"],
                 )
                 visual["target_summary"]["inference_reason"] = result["inference_reason"] or "user-selected prediction task"

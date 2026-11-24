@@ -458,9 +458,10 @@ def _diagnostic_split(df, target, problem_type, tools):
 def _model_rows(split, target, columns):
     # Give sklearn string feature names even when pandas column labels are tuples.
     names = ["feature", "target"] if len(columns) == 1 else ["left", "right", "target"]
+    positions = [split[0].columns.get_loc(column) for column in columns + [target]]
     frames = []
     for frame in split:
-        subset = frame[columns + [target]].replace([np.inf, -np.inf], np.nan).dropna()
+        subset = frame.iloc[:, positions].replace([np.inf, -np.inf], np.nan).dropna()
         subset.columns = names
         frames.append(subset)
     return frames
@@ -827,9 +828,10 @@ def render_vizall(
 
         train, _ = split
         private_columns = report.get("results", {}).get("pii", {})
-        candidates = [col for col in train.select_dtypes(include="number")
+        candidates = [col for col in train.select_dtypes(include="number", exclude="bool")
                       if col != target and col not in private_columns]
-        train_frame = train[candidates + [target]]
+        positions = [train.columns.get_loc(column) for column in candidates + [target]]
+        train_frame = train.iloc[:, positions]
         train_report = {"results": {"schema": SchemaPlugin().run(train_frame)}}
         training_evidence = build_visual_diagnostics(
             train_frame, train_report, target=target, problem_type=problem_type
