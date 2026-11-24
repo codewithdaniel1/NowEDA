@@ -9,12 +9,13 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - python: '3.8'
+            runner: ubuntu-24.04
             pandas: 'pandas==1.3.5'
             numpy: 'numpy<1.25'
           - python: '3.11'
