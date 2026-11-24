@@ -4,8 +4,10 @@ All notable changes to NowEDA are documented here.
 
 ---
 
-## Unreleased
+## [0.2.4]
 
+- The playground follows one beginner-friendly customer churn example, with
+  optional examples for regression, fraud, clustering, and large files.
 - Classifier charts show observed classes, straight and curved boundaries, and
   mistakes on the same held-out rows. Fitted charts select features using the training rows.
 - Yes/no features show class shares and group sizes. Visual evidence in
@@ -14,6 +16,8 @@ All notable changes to NowEDA are documented here.
   size and handle tables with zero rows.
 - Numeric phone, SSN and card columns with identifying names are checked for
   personal data signals. Built-in reports hide example values for flagged columns.
+- Visual diagnostics handle mixed column labels and nullable boolean features
+  on pandas 1.3.
 
 ---
 

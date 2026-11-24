@@ -48,6 +48,9 @@ straight boundary and a curved boundary make similar mistakes, try the simpler
 linear model first. A prediction of a number, such as a price, is a regression
 task. Its chart shows how far each prediction falls from the observed value.
 
+Follow a complete customer churn example in the
+[playground notebook](https://github.com/codewithdaniel1/NowEDA/blob/main/playground.ipynb).
+
 ### Large files
 
 Use explicit large mode when a CSV, TSV, TXT, or Parquet file should stay on
